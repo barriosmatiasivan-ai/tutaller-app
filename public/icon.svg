@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="108" fill="#101613"/>
+  <rect x="28" y="28" width="456" height="456" rx="86" fill="none" stroke="#18ef67" stroke-width="12" stroke-dasharray="28 18"/>
+  <rect x="166" y="64" width="180" height="240" rx="30" fill="#16231c" stroke="#ffffff" stroke-width="16"/>
+  <line x1="226" y1="98" x2="286" y2="98" stroke="#18ef67" stroke-width="12" stroke-linecap="round"/>
+  <path d="M220 186 L248 214 L296 160" fill="none" stroke="#18ef67" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="256" y="388" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="68" font-weight="900" fill="#ffffff">TU LOGO</text>
+  <text x="256" y="446" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="38" font-weight="700" fill="#18ef67">TU MARCA</text>
+</svg>

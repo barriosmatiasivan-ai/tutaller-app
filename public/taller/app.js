@@ -1,8 +1,68 @@
-// Tu Taller Soft · Workshop Tenant Client Application
+// Tu Taller Soft · Workshop Tenant Client Application (Unified UI)
 let currentSlug = '';
-let workshopData = null;
 let currentWorkshop = null;
 let currentSettings = null;
+let workshopData = { orders: [], clients: [], stock: [], cash_entries: [] };
+let activeSection = 'home';
+let searchQuery = '';
+let orderStatusFilter = '';
+
+const STATUS_CONFIG = {
+  received: { label: 'Recibido', class: 'repairing' },
+  in_progress: { label: 'En reparación', class: 'repairing' },
+  waiting_parts: { label: 'Esperando repuesto', class: 'parts' },
+  ready: { label: 'Listo para retirar', class: 'ready' },
+  delivered: { label: 'Entregado', class: 'delivered' },
+  cancelled: { label: 'Cancelado', class: 'cancelled' }
+};
+
+const COUNTRY_FLAGS = {
+  AR: '🇦🇷 AR', CL: '🇨🇱 CL', CO: '🇨🇴 CO', MX: '🇲🇽 MX',
+  PE: '🇵🇪 PE', UY: '🇺🇾 UY', ES: '🇪🇸 ES', US: '🇺🇸 US'
+};
+
+const COUNTRY_CURRENCY = {
+  AR: 'ARS', CL: 'CLP', CO: 'COP', MX: 'MXN',
+  PE: 'PEN', UY: 'UYU', ES: 'EUR', US: 'USD'
+};
+
+const BRAND_ALIASES = {
+  apple: ['apple', 'iphone', 'ipad'],
+  samsung: ['samsung', 'galaxy'],
+  motorola: ['motorola', 'moto'],
+  xiaomi: ['xiaomi', 'redmi', 'poco'],
+  huawei: ['huawei'],
+  nokia: ['nokia'],
+  oppo: ['oppo'],
+  vivo: ['vivo'],
+  honor: ['honor'],
+  oneplus: ['oneplus', 'one plus'],
+  sony: ['sony', 'xperia'],
+  lg: ['lg']
+};
+
+function getBrandKey(brandStr) {
+  if (!brandStr) return null;
+  const lower = brandStr.toLowerCase().trim();
+  for (const [key, aliases] of Object.entries(BRAND_ALIASES)) {
+    if (aliases.some(alias => lower === alias || lower.startsWith(alias + ' '))) {
+      return key;
+    }
+  }
+  return null;
+}
+
+function brandBadge(brandStr) {
+  const key = getBrandKey(brandStr);
+  return `
+    <span class="phone-icon brand-icon" aria-hidden="true">
+      ${key ? `<img src="/brands/${key}.svg" alt="${esc(brandStr)}" width="48" height="40" onerror="this.remove()">` : ''}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" focusable="false">
+        <rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 5h4M11 19h2"/>
+      </svg>
+    </span>
+  `;
+}
 
 function getSlug() {
   const path = window.location.pathname;
@@ -20,13 +80,19 @@ function toast(msg, isErr = false) {
 }
 
 function esc(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-function formatMoney(amount, currency = 'ARS') {
+function formatMoney(amount, currency = null) {
+  const curr = currency || currentWorkshop?.currency || 'ARS';
   const num = Number(amount || 0);
-  const sym = currency === 'USD' ? 'USD $' : (currency === 'EUR' ? '€' : '$');
+  const sym = curr === 'USD' ? 'USD $' : (curr === 'EUR' ? '€' : '$');
   return `${sym} ${num.toLocaleString('es-AR')}`;
 }
 
@@ -40,484 +106,772 @@ async function api(path, options = {}) {
   return data;
 }
 
-// Cargar información y datos del taller
+function modal(title, content) {
+  const d = document.querySelector('#app-modal');
+  d.innerHTML = `
+    <div class="modal-heading">
+      <h2>${title}</h2>
+      <button type="button" class="icon-button" id="close-app-modal" aria-label="Cerrar">×</button>
+    </div>
+    ${content}
+  `;
+  d.querySelector('#close-app-modal').onclick = () => d.close();
+  d.showModal();
+  return d;
+}
+
+// Carga inicial del taller
 async function loadWorkshop() {
   currentSlug = getSlug();
   try {
-    const [infoRes, dataRes] = await Promise.all([
-      api(`/api/workshop/${currentSlug}/info`),
-      api(`/api/workshop/${currentSlug}/data`)
-    ]);
-
-    currentWorkshop = infoRes.workshop;
+    const dataRes = await api(`/api/workshop/${currentSlug}/data`);
+    currentWorkshop = dataRes.workshop;
     currentSettings = dataRes.settings || {};
-    workshopData = dataRes;
+    workshopData = {
+      orders: dataRes.orders || [],
+      clients: dataRes.clients || [],
+      stock: dataRes.stock || [],
+      cash_entries: dataRes.cash_entries || []
+    };
 
-    // Actualizar cabecera
-    document.querySelector('#header-workshop-name').textContent = currentWorkshop.name;
-    document.querySelector('#header-workshop-sub').innerHTML = `
-      Plan <strong>${currentWorkshop.plan === 'pro' ? 'Pro' : 'Básico'}</strong> &bull; 
-      ${currentWorkshop.days_remaining} días restantes (${currentWorkshop.country || 'AR'})
-    `;
+    updateBrandUI();
+    updateHeaderUI();
 
-    // Si no completó onboarding, mostrar banner y modal
+    // Si aún no completó onboarding de país y métodos de pago
     if (!currentWorkshop.onboarding_completed) {
-      document.querySelector('#onboarding-notice').style.display = 'flex';
       document.querySelector('#onboarding-modal').showModal();
-    } else {
-      document.querySelector('#onboarding-notice').style.display = 'none';
     }
 
-    renderAll();
+    renderCurrentSection();
   } catch (err) {
     toast(`Error al cargar taller: ${err.message}`, true);
-    document.querySelector('#header-workshop-name').textContent = 'Error de conexión';
+    document.querySelector('#home-title').textContent = 'Error al conectar con el taller';
   }
 }
 
-function renderAll() {
-  renderOrders();
-  renderClients();
-  renderStock();
-  renderCash();
-  renderSettings();
+function updateBrandUI() {
+  const name = currentWorkshop.name || 'Mi Taller';
+  document.title = `${name} · Tu Taller`;
+  document.querySelector('#sidebar-workshop-title').textContent = name;
+  document.querySelector('#sidebar-plan-label').textContent = `Plan ${currentWorkshop.plan === 'pro' ? 'Pro' : 'Básico'} · ${currentWorkshop.days_remaining} días restantes`;
+
+  const logoImg = document.querySelector('#sidebar-logo');
+  const mobLogo = document.querySelector('#mobile-logo');
+  if (currentSettings.logo_url) {
+    logoImg.src = currentSettings.logo_url;
+    mobLogo.src = currentSettings.logo_url;
+  } else {
+    logoImg.src = '/logo.png';
+    mobLogo.src = '/logo.png';
+  }
 }
 
-// 1. Render Órdenes
-function renderOrders() {
+function updateHeaderUI() {
+  const country = (currentWorkshop.country || 'AR').toUpperCase();
+  document.querySelector('#header-country-pill').textContent = COUNTRY_FLAGS[country] || `🌍 ${country}`;
+
+  const pms = (currentWorkshop.payment_methods || 'efectivo,mercadopago,transferencia').split(',');
+  const badgesContainer = document.querySelector('#header-payment-badges');
+  let badgesHtml = '';
+
+  if (pms.includes('mercadopago')) {
+    badgesHtml += `<span class="badge-mp">⚡ MP</span>`;
+  }
+  if (pms.includes('efectivo')) {
+    badgesHtml += `<span class="badge-cash">💵 Efvo</span>`;
+  }
+  if (pms.includes('transferencia')) {
+    badgesHtml += `<span class="badge-transfer">🏦 Transf</span>`;
+  }
+  badgesContainer.innerHTML = badgesHtml;
+}
+
+// Control de secciones
+function setSection(sectionName) {
+  activeSection = sectionName;
+  document.querySelectorAll('.view-section').forEach(sec => sec.style.display = 'none');
+  const target = document.querySelector(`#section-${sectionName}`);
+  if (target) target.style.display = 'block';
+
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.section === sectionName);
+  });
+
+  renderCurrentSection();
+}
+
+function renderCurrentSection() {
+  renderHome();
+  if (activeSection === 'orders') renderOrders();
+  if (activeSection === 'clients') renderClients();
+  if (activeSection === 'stock') renderStock();
+  if (activeSection === 'cash') renderCash();
+  if (activeSection === 'settings') renderSettings();
+}
+
+// 1. Render Dashboard (Inicio)
+function renderHome() {
   const orders = workshopData.orders || [];
-  document.querySelector('#count-orders').textContent = orders.length;
+  const clients = workshopData.clients || [];
 
-  const search = document.querySelector('#order-search').value.trim().toLowerCase();
-  const filterStatus = document.querySelector('#order-filter-status').value;
+  const activeCount = orders.filter(o => ['received', 'in_progress'].includes(o.status)).length;
+  const readyCount = orders.filter(o => o.status === 'ready').length;
+  const partsCount = orders.filter(o => o.status === 'waiting_parts').length;
+  const debtCount = orders.filter(o => Number(o.balance_cents || 0) > 0 && o.status !== 'cancelled').length;
 
-  const filtered = orders.filter(o => {
-    if (filterStatus && o.status !== filterStatus) return false;
-    if (search) {
-      const match = (o.brand && o.brand.toLowerCase().includes(search)) ||
-                    (o.model && o.model.toLowerCase().includes(search)) ||
-                    (o.client_name && o.client_name.toLowerCase().includes(search)) ||
-                    (String(o.order_number).includes(search));
-      if (!match) return false;
-    }
-    return true;
-  });
+  document.querySelector('#kpi-active-count').textContent = activeCount;
+  document.querySelector('#kpi-ready-count').textContent = readyCount;
+  document.querySelector('#kpi-parts-count').textContent = partsCount;
+  document.querySelector('#kpi-clients-count').textContent = clients.length;
 
-  const tbody = document.querySelector('#orders-tbody');
-  if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">No se encontraron órdenes registradas.</td></tr>`;
-    return;
-  }
+  document.querySelector('#rev-active-count').textContent = activeCount;
+  document.querySelector('#rev-active-text').textContent = activeCount > 0 ? `${activeCount} en banco de trabajo` : '✓ Estás al día';
 
-  tbody.innerHTML = filtered.map(o => {
-    let statusClass = 'status-progress';
-    let statusLabel = 'Recibido';
-    if (o.status === 'ready') { statusClass = 'status-ready'; statusLabel = 'Listo para retirar'; }
-    else if (o.status === 'waiting_parts') { statusClass = 'status-parts'; statusLabel = 'Esperando repuesto'; }
-    else if (o.status === 'delivered') { statusClass = 'status-delivered'; statusLabel = 'Entregado'; }
-    else if (o.status === 'estimate') { statusClass = 'status-parts'; statusLabel = 'Presupuesto'; }
+  document.querySelector('#rev-ready-count').textContent = readyCount;
+  document.querySelector('#rev-ready-text').textContent = readyCount > 0 ? `${readyCount} por avisar / retirar` : '✓ Estás al día';
 
-    const cleanPhone = (o.client_phone || '').replace(/[^0-9]/g, '');
-    let waBtn = '';
-    if (cleanPhone) {
-      const msg = encodeURIComponent(`Hola ${o.client_name}! Te avisamos de ${currentWorkshop.name} que tu equipo ${o.brand} ${o.model} (Orden #${o.order_number}) está ${statusLabel.toLowerCase()}.`);
-      waBtn = `<a href="https://wa.me/${cleanPhone}?text=${msg}" target="_blank" class="secondary" title="Avisar por WhatsApp" style="text-decoration:none;padding:5px 8px;display:inline-flex;align-items:center;">💬</a>`;
-    }
+  document.querySelector('#rev-parts-count').textContent = partsCount;
+  document.querySelector('#rev-parts-text').textContent = partsCount > 0 ? `${partsCount} pendientes de compra` : '✓ Estás al día';
 
-    return `
-      <tr>
-        <td><strong>#${o.order_number}</strong></td>
-        <td>
-          <div style="font-weight:700;color:#fff;">${esc(o.brand)} ${esc(o.model)}</div>
-          <div style="font-size:11px;color:var(--text-muted);">${o.condition || 'Sin detalles estéticos'}</div>
-        </td>
-        <td>
-          <div>${esc(o.client_name || 'Sin cliente')}</div>
-          <div style="font-size:12px;color:var(--text-muted);">${esc(o.client_phone || '')}</div>
-        </td>
-        <td style="max-width:240px;font-size:13px;">${esc(o.fault)}</td>
-        <td><span class="status-pill ${statusClass}" style="font-size:11px;padding:4px 10px;">${statusLabel}</span></td>
-        <td>
-          <div class="actions-cell">
-            ${waBtn}
-            <button class="secondary" onclick="openReceipt('${o.id}')" title="Ver Comprobante">🖨️</button>
-            <button class="secondary" onclick="cycleStatus('${o.id}', '${o.status}')" title="Avanzar estado">⏭️</button>
-          </div>
-        </td>
-      </tr>
+  document.querySelector('#rev-debt-count').textContent = debtCount;
+  document.querySelector('#rev-debt-text').textContent = debtCount > 0 ? `${debtCount} con saldo pendiente` : '✓ Estás al día';
+
+  const homeContainer = document.querySelector('#home-orders-container');
+  const ongoing = orders.filter(o => !['delivered', 'cancelled'].includes(o.status));
+
+  if (ongoing.length === 0) {
+    homeContainer.innerHTML = `
+      <div class="empty" style="padding:28px 16px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:8px;">🚀</div>
+        <h3 style="margin-bottom:6px;">¡Tu taller está listo para arrancar!</h3>
+        <p class="muted" style="max-width:420px;margin:0 auto 16px;font-size:13px;line-height:1.4;">
+          Ingresá el primer equipo que entra a tu taller para registrar la falla, emitir el comprobante y generar el enlace de seguimiento con QR.
+        </p>
+        <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
+          <button type="button" class="primary" id="btn-home-first-order">＋ Ingresar primer equipo</button>
+        </div>
+      </div>
     `;
-  }).join('');
+    document.querySelector('#btn-home-first-order')?.addEventListener('click', openNewOrderModal);
+  } else {
+    homeContainer.innerHTML = ongoing.slice(0, 6).map(orderCardHtml).join('');
+    bindOrderCardClicks(homeContainer);
+  }
 }
 
-// 2. Render Clientes
-function renderClients() {
-  const clients = workshopData.clients || [];
-  document.querySelector('#count-clients').textContent = clients.length;
+// 2. Render Órdenes
+function renderOrders() {
+  const container = document.querySelector('#orders-full-container');
+  let list = workshopData.orders || [];
 
-  const search = document.querySelector('#client-search').value.trim().toLowerCase();
-  const filtered = clients.filter(c => {
-    if (!search) return true;
-    return (c.name && c.name.toLowerCase().includes(search)) ||
-           (c.phone && c.phone.includes(search));
-  });
+  if (orderStatusFilter) {
+    list = list.filter(o => o.status === orderStatusFilter);
+  }
 
-  const tbody = document.querySelector('#clients-tbody');
-  if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);">Sin clientes cargados aún.</td></tr>`;
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(o => {
+      return (o.brand && o.brand.toLowerCase().includes(q)) ||
+             (o.model && o.model.toLowerCase().includes(q)) ||
+             (o.fault && o.fault.toLowerCase().includes(q)) ||
+             (o.client_name && o.client_name.toLowerCase().includes(q)) ||
+             (o.client_phone && o.client_phone.includes(q)) ||
+             String(o.order_number).includes(q);
+    });
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="empty">
+        <span>▯</span>
+        <h3>No se encontraron reparaciones</h3>
+        <p>Probá con otro término de búsqueda o cambiá el filtro de estado.</p>
+      </div>
+    `;
     return;
   }
 
-  tbody.innerHTML = filtered.map(c => {
-    const cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');
-    const waLink = cleanPhone ? `<a href="https://wa.me/${cleanPhone}" target="_blank" class="secondary" style="text-decoration:none;padding:5px 8px;">💬</a>` : '-';
-    return `
-      <tr>
-        <td><strong>${esc(c.name)}</strong></td>
-        <td>${esc(c.phone || '-')}</td>
-        <td>${esc(c.email || '-')}</td>
-        <td>${c.order_count || 0} equipos</td>
-        <td>${waLink}</td>
-      </tr>
-    `;
-  }).join('');
+  container.innerHTML = list.map(orderCardHtml).join('');
+  bindOrderCardClicks(container);
+}
 
-  // Actualizar selector de clientes en modal de nueva orden
-  const select = document.querySelector('#order-client-select');
-  select.innerHTML = `
-    <option value="">Seleccionar cliente existente...</option>
-    <option value="NEW">＋ [Crear nuevo cliente rápido]</option>
-    ${clients.map(c => `<option value="${c.id}">${esc(c.name)} (${esc(c.phone || 'Sin tel')})</option>`).join('')}
+function orderCardHtml(order) {
+  const st = STATUS_CONFIG[order.status] || { label: order.status, class: 'repairing' };
+  const clientName = order.client_name || 'Cliente sin asignar';
+  const clientPhone = order.client_phone ? ` · ${esc(order.client_phone)}` : '';
+  const trackingUrl = `/seguimiento/${order.intake_key || order.id}`;
+  const total = Number(order.total_cost || 0);
+  const saldo = Number(order.balance_cents || 0) / 100;
+
+  return `
+    <div class="order-card-enhanced" data-order-id="${order.id}">
+      ${brandBadge(order.brand)}
+      <div class="order-meta">
+        <strong>
+          <span class="muted small">#${order.order_number}</span>
+          <span>${esc(clientName)}${clientPhone}</span>
+        </strong>
+        <span class="device-text">${esc(order.brand)} ${esc(order.model)}</span>
+        <span class="fault-text">${esc(order.fault || 'Revisión técnica')}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
+        <span class="badge ${st.class}"><span class="dot"></span>${st.label}</span>
+        ${saldo > 0 ? `<span class="order-finance-badge has-debt">Saldo: ${formatMoney(saldo)}</span>` : (total > 0 ? `<span class="order-finance-badge paid">✓ Pagado</span>` : '')}
+      </div>
+      <div class="order-actions-btns" onclick="event.stopPropagation();">
+        ${order.client_phone ? `
+          <a class="order-action-icon" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}, te escribimos de ${currentWorkshop.name} sobre tu orden #${order.order_number} (${order.brand} ${order.model}): estado actual: ${st.label}.`)}" target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp al cliente">
+            💬
+          </a>
+        ` : ''}
+        <a class="order-action-icon" href="${trackingUrl}" target="_blank" rel="noopener noreferrer" title="Ver comprobante y QR de seguimiento">
+          📲
+        </a>
+      </div>
+      <span class="chevron" style="margin-left:6px;">›</span>
+    </div>
   `;
 }
 
-// 3. Render Stock
-function renderStock() {
-  const stock = workshopData.stock || [];
-  const search = document.querySelector('#stock-search').value.trim().toLowerCase();
-  const filtered = stock.filter(s => !search || s.name.toLowerCase().includes(search));
+function bindOrderCardClicks(parent) {
+  parent.querySelectorAll('[data-order-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const oid = el.dataset.orderId;
+      const order = workshopData.orders.find(o => o.id === oid);
+      if (order) openOrderDetailModal(order);
+    });
+  });
+}
 
-  const tbody = document.querySelector('#stock-tbody');
-  if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);">No hay repuestos registrados.</td></tr>`;
+// Modal de detalle de orden
+function openOrderDetailModal(order) {
+  const st = STATUS_CONFIG[order.status] || { label: order.status };
+  const clientName = order.client_name || 'Sin nombre';
+  const clientPhone = order.client_phone || 'Sin teléfono';
+  const trackingUrl = `/seguimiento/${order.intake_key || order.id}`;
+
+  const d = modal(`Orden #${order.order_number} · ${esc(order.brand)} ${esc(order.model)}`, `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        <div>
+          <strong style="font-size:16px;color:#fff;">${esc(clientName)}</strong>
+          <p class="muted" style="margin:2px 0 0;font-size:13px;">${esc(clientPhone)}</p>
+        </div>
+        <a href="${trackingUrl}" target="_blank" class="secondary compact" style="text-decoration:none;">📲 Abrir seguimiento QR</a>
+      </div>
+
+      <dl>
+        <dt>Falla</dt><dd>${esc(order.fault || 'Sin especificar')}</dd>
+        <dt>Estado físico</dt><dd>${esc(order.condition || 'Sin observaciones')}</dd>
+        <dt>Accesorios</dt><dd>${esc(order.accessories || 'Solo el equipo')}</dd>
+        <dt>IMEI / Serie</dt><dd>${esc(order.identifier || 'No especificado')}</dd>
+      </dl>
+
+      <form id="order-status-form" style="margin-top:16px;">
+        <label>Cambiar estado de reparación
+          <select id="edit-order-status" style="margin-top:6px;">
+            <option value="received" ${order.status==='received'?'selected':''}>Recibido</option>
+            <option value="in_progress" ${order.status==='in_progress'?'selected':''}>En reparación</option>
+            <option value="waiting_parts" ${order.status==='waiting_parts'?'selected':''}>Esperando repuesto</option>
+            <option value="ready" ${order.status==='ready'?'selected':''}>Listo para retirar</option>
+            <option value="delivered" ${order.status==='delivered'?'selected':''}>Entregado</option>
+            <option value="cancelled" ${order.status==='cancelled'?'selected':''}>Cancelado</option>
+          </select>
+        </label>
+        <div class="form-actions" style="margin-top:10px;">
+          <button type="submit" class="primary">Actualizar estado</button>
+        </div>
+      </form>
+
+      ${order.client_phone ? `
+        <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);">
+          <label>Aviso rápido por WhatsApp</label>
+          <a class="primary" style="margin-top:8px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop.name} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
+            💬 Notificar al cliente por WhatsApp
+          </a>
+        </div>
+      ` : ''}
+    </div>
+  `);
+
+  d.querySelector('#order-status-form').onsubmit = async e => {
+    e.preventDefault();
+    const newStatus = d.querySelector('#edit-order-status').value;
+    try {
+      await api(`/api/workshop/${currentSlug}/orders/${order.id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: newStatus })
+      });
+      order.status = newStatus;
+      toast(`Orden #${order.order_number} actualizada a "${STATUS_CONFIG[newStatus]?.label || newStatus}"`);
+      d.close();
+      renderCurrentSection();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  };
+}
+
+// 3. Render Clientes
+function renderClients() {
+  const container = document.querySelector('#clients-container');
+  let list = workshopData.clients || [];
+
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.phone && c.phone.includes(q)));
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="empty">
+        <span>👥</span>
+        <h3>Sin clientes cargados</h3>
+        <p>Agregá tu primer cliente con el botón de arriba.</p>
+      </div>
+    `;
     return;
   }
 
-  tbody.innerHTML = filtered.map(s => `
-    <tr>
-      <td><strong>${esc(s.name)}</strong></td>
-      <td><code>${esc(s.sku || '-')}</code></td>
-      <td>
-        <span style="font-weight:700;color:${s.quantity <= (s.min_stock || 1) ? '#ef4444' : 'var(--accent)'};">
-          ${s.quantity} un.
-        </span>
-      </td>
-      <td>${formatMoney(s.cost_price, currentWorkshop.currency)}</td>
-      <td>${formatMoney(s.sale_price, currentWorkshop.currency)}</td>
-    </tr>
+  container.innerHTML = list.map(c => `
+    <div class="client-row">
+      <div class="avatar">${esc(c.name.slice(0, 1).toUpperCase())}</div>
+      <div>
+        <strong>${esc(c.name)}</strong>
+        <p class="muted">${esc(c.phone || 'Sin teléfono')}${c.email ? ` · ${esc(c.email)}` : ''}</p>
+      </div>
+      <button type="button" class="secondary compact" data-client-phone="${esc(c.phone || '')}">
+        ${c.order_count ? `${c.order_count} reparaciones` : 'Ficha'}
+      </button>
+    </div>
   `).join('');
 }
 
-// 4. Render Caja Diaria
-function renderCash() {
-  const entries = workshopData.cash_entries || [];
-  let totalIn = 0;
-  let totalMp = 0;
-  let totalCash = 0;
-  let totalTrans = 0;
+// 4. Render Stock
+function renderStock() {
+  const container = document.querySelector('#stock-container');
+  const items = workshopData.stock || [];
 
-  entries.forEach(e => {
-    const amt = Number(e.amount || 0);
-    totalIn += amt;
-    if (e.payment_method === 'mercadopago') totalMp += amt;
-    else if (e.payment_method === 'efectivo') totalCash += amt;
-    else totalTrans += amt;
-  });
-
-  document.querySelector('#cash-total-today').textContent = formatMoney(totalIn, currentWorkshop.currency);
-  document.querySelector('#cash-mp-today').textContent = formatMoney(totalMp, currentWorkshop.currency);
-  document.querySelector('#cash-cash-today').textContent = formatMoney(totalCash, currentWorkshop.currency);
-  document.querySelector('#cash-trans-today').textContent = formatMoney(totalTrans, currentWorkshop.currency);
-
-  const tbody = document.querySelector('#cash-tbody');
-  if (!entries.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);">Sin movimientos registrados.</td></tr>`;
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="empty">
+        <span>📦</span>
+        <h3>Inventario vacío</h3>
+        <p>Cargá pantallas, baterías, pines de carga y accesorios para controlar tu stock.</p>
+      </div>
+    `;
     return;
   }
 
-  tbody.innerHTML = entries.map(e => {
-    let methodBadge = '<span class="badge-cash">Efectivo</span>';
-    if (e.payment_method === 'mercadopago') methodBadge = '<span class="badge-mp">💙 Mercado Pago</span>';
-    else if (e.payment_method === 'transferencia') methodBadge = '<span class="badge-trans">🏦 Transferencia</span>';
-    else if (e.payment_method === 'tarjeta') methodBadge = '<span class="badge-trans">💳 Tarjeta</span>';
-
-    return `
-      <tr>
-        <td>${e.created_at ? new Date(e.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-        <td>${esc(e.concept)}</td>
-        <td>${methodBadge}</td>
-        <td><span style="color:${(e.type === 'income' || e.type === 'in') ? 'var(--accent)' : '#ef4444'};font-weight:700;">${(e.type === 'income' || e.type === 'in') ? 'Ingreso' : 'Egreso'}</span></td>
-        <td><strong>${formatMoney(e.amount, currentWorkshop.currency)}</strong></td>
-      </tr>
-    `;
-  }).join('');
+  container.innerHTML = items.map(s => `
+    <div class="stock-card">
+      <div>
+        <strong>${esc(s.name)}</strong>
+        <p class="muted">${esc(s.category || 'General')}${s.sku ? ` · SKU: ${esc(s.sku)}` : ''}</p>
+      </div>
+      <div class="stock-numbers">
+        <strong>${s.quantity || 0} u.</strong>
+        <span class="muted">${formatMoney(s.price || 0)}</span>
+      </div>
+    </div>
+  `).join('');
 }
 
-// 5. Render Configuración
-function renderSettings() {
-  if (!currentWorkshop) return;
-  document.querySelector('#settings-name').value = currentWorkshop.name || '';
-  document.querySelector('#settings-country').value = currentWorkshop.country || 'AR';
-  document.querySelector('#settings-phone').value = currentWorkshop.phone || '';
-  document.querySelector('#settings-address').value = currentWorkshop.address || '';
+// 5. Render Caja
+function renderCash() {
+  const container = document.querySelector('#cash-container');
+  const entries = workshopData.cash_entries || [];
 
-  const payments = (currentWorkshop.payment_methods || '').split(',');
-  document.querySelector('#chk-mp').checked = payments.includes('mercadopago');
-  document.querySelector('#chk-cash').checked = payments.includes('efectivo');
-  document.querySelector('#chk-trans').checked = payments.includes('transferencia');
-  document.querySelector('#chk-card').checked = payments.includes('tarjeta');
-}
+  let income = 0;
+  let expense = 0;
+  let mpTotal = 0;
 
-// Ciclo de estados de la orden
-window.cycleStatus = async function(orderId, currentStatus) {
-  const nextMap = {
-    received: 'estimate',
-    estimate: 'waiting_parts',
-    waiting_parts: 'ready',
-    ready: 'delivered',
-    delivered: 'received'
-  };
-  const newStatus = nextMap[currentStatus] || 'received';
-  try {
-    await api(`/api/workshop/${currentSlug}/orders/${orderId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status: newStatus })
-    });
-    toast('Estado de orden actualizado.');
-    await loadWorkshop();
-  } catch (err) {
-    toast(err.message, true);
-  }
-};
-
-// Ver / Imprimir Comprobante
-window.openReceipt = function(orderId) {
-  const order = (workshopData.orders || []).find(o => o.id === orderId);
-  if (!order) return;
-
-  const content = document.querySelector('#receipt-preview-content');
-  const token = order.intake_key || order.id;
-  const trackingUrl = `https://app.tutallersoft.com/seguimiento/${token}`;
-
-  content.innerHTML = `
-    ========================================
-    ${(currentWorkshop.name || 'TU TALLER').toUpperCase()}
-    ${currentWorkshop.address || 'Servicio Técnico Especializado'}
-    Tel / WhatsApp: ${currentWorkshop.phone || '-'}
-    ========================================
-    ORDEN DE REPARACIÓN #${order.order_number}
-    Fecha: ${new Date(order.created_at || Date.now()).toLocaleDateString('es-AR')}
-    ----------------------------------------
-    CLIENTE: ${order.client_name || '-'}
-    TELÉFONO: ${order.client_phone || '-'}
-    EQUIPO: ${order.brand} ${order.model}
-    FALLA: ${order.fault}
-    DETALLES: ${order.condition || 'Sin golpes visibles'}
-    ----------------------------------------
-    CONSULTÁ EL ESTADO DE TU EQUIPO CON QR:
-    🔗 ${trackingUrl}
-    ----------------------------------------
-    Garantía de 30 días sobre mano de obra.
-    ========================================
-  `;
-
-  const cleanPhone = (order.client_phone || '').replace(/[^0-9]/g, '');
-  const waBtn = document.querySelector('#share-wa-btn');
-  if (cleanPhone) {
-    const text = encodeURIComponent(`Hola ${order.client_name}! Constancia de ingreso de tu equipo en ${currentWorkshop.name}. Orden #${order.order_number} (${order.brand} ${order.model}). Podés consultar el estado de tu reparación en cualquier momento aquí: ${trackingUrl}`);
-    waBtn.href = `https://wa.me/${cleanPhone}?text=${text}`;
-    waBtn.style.display = 'inline-flex';
-  } else {
-    waBtn.style.display = 'none';
-  }
-
-  document.querySelector('#receipt-modal').showModal();
-};
-
-// Event Listeners
-document.addEventListener('DOMContentLoaded', () => {
-  loadWorkshop();
-
-  // Cambio de pestañas
-  document.querySelectorAll('.nav-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      document.querySelector(`#${btn.dataset.tab}`).classList.add('active');
-    });
-  });
-
-  // Filtros
-  document.querySelector('#order-search').addEventListener('input', renderOrders);
-  document.querySelector('#order-filter-status').addEventListener('change', renderOrders);
-  document.querySelector('#client-search').addEventListener('input', renderClients);
-  document.querySelector('#stock-search').addEventListener('input', renderStock);
-
-  // Modales
-  const orderModal = document.querySelector('#new-order-modal');
-  document.querySelector('#open-new-order-btn').addEventListener('click', () => orderModal.showModal());
-  document.querySelector('#close-order-modal').addEventListener('click', () => orderModal.close());
-  document.querySelector('#cancel-order-btn').addEventListener('click', () => orderModal.close());
-
-  const receiptModal = document.querySelector('#receipt-modal');
-  document.querySelector('#close-receipt-modal').addEventListener('click', () => receiptModal.close());
-  document.querySelector('#print-receipt-btn').addEventListener('click', () => window.print());
-
-  const onbModal = document.querySelector('#onboarding-modal');
-  document.querySelector('#open-onboarding-btn').addEventListener('click', () => onbModal.showModal());
-  document.querySelector('#close-onboarding-modal').addEventListener('click', () => onbModal.close());
-
-  // Cliente rápido en formulario de orden
-  document.querySelector('#order-client-select').addEventListener('change', e => {
-    const group = document.querySelector('#quick-client-group');
-    group.style.display = e.target.value === 'NEW' ? 'block' : 'none';
-  });
-
-  // Crear Orden Formulario
-  document.querySelector('#new-order-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const clientSelect = document.querySelector('#order-client-select').value;
-    let clientId = clientSelect;
-    let clientName = '';
-    let clientPhone = '';
-
-    if (clientSelect === 'NEW') {
-      clientName = document.querySelector('#order-quick-client-name').value.trim();
-      clientPhone = document.querySelector('#order-quick-client-phone').value.trim();
-      if (!clientName) { toast('Ingresá el nombre del nuevo cliente', true); return; }
+  for (const e of entries) {
+    const amt = Number(e.amount || 0);
+    if (e.type === 'income') {
+      income += amt;
+      if (e.payment_method === 'mercadopago') mpTotal += amt;
+    } else {
+      expense += amt;
     }
+  }
+
+  document.querySelector('#cash-income-total').textContent = formatMoney(income);
+  document.querySelector('#cash-expense-total').textContent = formatMoney(expense);
+  document.querySelector('#cash-mp-total').textContent = formatMoney(mpTotal);
+  document.querySelector('#cash-net-total').textContent = formatMoney(income - expense);
+
+  if (entries.length === 0) {
+    container.innerHTML = `
+      <div class="empty">
+        <span>💵</span>
+        <h3>Sin movimientos de caja</h3>
+        <p>Registrá los cobros y egresos diarios de tu mostrador.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = entries.map(e => `
+    <div class="cash-row">
+      <div>
+        <strong>${esc(e.concept || 'Movimiento')}</strong>
+        <p class="muted">
+          ${new Date(e.created_at).toLocaleDateString('es-AR')} &bull; 
+          <span style="text-transform:capitalize;">${esc(e.payment_method || 'Efectivo')}</span> &bull; 
+          ${e.type === 'income' ? 'Ingreso' : 'Egreso'}
+        </p>
+      </div>
+      <div class="cash-row-amount">
+        <strong style="color:${e.type === 'income' ? '#34d399' : '#f87171'};">
+          ${e.type === 'income' ? '+' : '-'}${formatMoney(e.amount)}
+        </strong>
+      </div>
+    </div>
+  `).join('');
+}
+
+// 6. Render Configuración
+function renderSettings() {
+  document.querySelector('#set-workshop-name').value = currentWorkshop.name || '';
+  document.querySelector('#set-workshop-phone').value = currentWorkshop.phone || '';
+  document.querySelector('#set-workshop-address').value = currentWorkshop.address || '';
+  document.querySelector('#set-workshop-logo-url').value = currentSettings.logo_url || '';
+
+  const country = (currentWorkshop.country || 'AR').toUpperCase();
+  document.querySelector('#set-workshop-country').value = country;
+  document.querySelector('#set-workshop-currency').value = COUNTRY_CURRENCY[country] || 'ARS';
+
+  const pms = (currentWorkshop.payment_methods || 'efectivo,mercadopago,transferencia').split(',');
+  document.querySelector('#pm-mercadopago').checked = pms.includes('mercadopago');
+  document.querySelector('#pm-efectivo').checked = pms.includes('efectivo');
+  document.querySelector('#pm-transferencia').checked = pms.includes('transferencia');
+  document.querySelector('#pm-tarjeta').checked = pms.includes('tarjeta');
+}
+
+// Modal nuevo equipo
+function openNewOrderModal() {
+  const clients = workshopData.clients || [];
+  const clientOptions = clients.map(c => `<option value="${c.id}">${esc(c.name)} (${esc(c.phone || 'S/N')})</option>`).join('');
+
+  const d = modal('＋ Ingresar nuevo equipo', `
+    <form id="new-intake-form" class="form-grid">
+      <label class="wide">Cliente
+        <select name="client_id" id="intake-client-select" required>
+          <option value="NEW">＋ Crear cliente nuevo en el momento</option>
+          ${clientOptions}
+        </select>
+      </label>
+
+      <div id="new-client-inputs" class="wide" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <label>Nombre y apellido del cliente
+          <input name="client_name" required placeholder="Ej: Carlos Gómez">
+        </label>
+        <label>Teléfono o WhatsApp
+          <input name="client_phone" required type="tel" placeholder="Ej: +54 9 11 1234-5678">
+        </label>
+      </div>
+
+      <label>Marca del celular
+        <input name="brand" required placeholder="Samsung, Motorola, Apple, Xiaomi...">
+      </label>
+      <label>Modelo
+        <input name="model" required placeholder="A52, Moto G84, iPhone 11...">
+      </label>
+      <label class="wide">Falla manifestada por el cliente
+        <textarea name="fault" required rows="2" placeholder="Ej: No enciende, cambio de módulo pantalla..."></textarea>
+      </label>
+      <label class="wide">Estado físico al recibir
+        <input name="condition" placeholder="Ej: Rayones en tapa, vidrio astillado...">
+      </label>
+      <label class="wide">Accesorios entregados
+        <input name="accessories" placeholder="Ej: Con funda y chip, sin cargador">
+      </label>
+      <label>IMEI o N° de Serie (opcional)
+        <input name="identifier" placeholder="15 dígitos">
+      </label>
+      <label>Medio de cobro preferido
+        <select name="payment_method">
+          <option value="efectivo">Efectivo</option>
+          <option value="mercadopago">Mercado Pago</option>
+          <option value="transferencia">Transferencia bancaria</option>
+          <option value="tarjeta">Tarjeta</option>
+        </select>
+      </label>
+
+      <div class="form-actions">
+        <button type="submit" class="primary" id="btn-submit-order">Registrar ingreso</button>
+      </div>
+    </form>
+  `);
+
+  const clientSel = d.querySelector('#intake-client-select');
+  const newClientBlock = d.querySelector('#new-client-inputs');
+  clientSel.onchange = () => {
+    const isNew = clientSel.value === 'NEW';
+    newClientBlock.style.display = isNew ? 'grid' : 'none';
+    newClientBlock.querySelectorAll('input').forEach(inp => inp.required = isNew);
+  };
+
+  d.querySelector('#new-intake-form').onsubmit = async e => {
+    e.preventDefault();
+    const btn = d.querySelector('#btn-submit-order');
+    btn.disabled = true;
+    const fd = new FormData(e.target);
+    const payload = Object.fromEntries(fd);
 
     try {
-      const payload = {
-        client_id: clientId,
-        client_name: clientName,
-        client_phone: clientPhone,
-        brand: document.querySelector('#order-brand').value.trim(),
-        model: document.querySelector('#order-model').value.trim(),
-        fault: document.querySelector('#order-fault').value.trim(),
-        condition: document.querySelector('#order-condition').value.trim()
-      };
-
       const res = await api(`/api/workshop/${currentSlug}/orders`, {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-
-      toast(`¡Orden #${res.order_number} ingresada exitosamente!`);
-      orderModal.close();
-      e.target.reset();
-      document.querySelector('#quick-client-group').style.display = 'none';
+      toast(`¡Orden #${res.order_number} ingresada con éxito!`);
+      d.close();
       await loadWorkshop();
-      openReceipt(res.id);
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+}
+
+// Modal nuevo cliente
+function openNewClientModal() {
+  const d = modal('＋ Registrar nuevo cliente', `
+    <form id="new-client-form" class="form-grid">
+      <label class="wide">Nombre y apellido
+        <input name="name" required placeholder="Ej: Juan Pérez">
+      </label>
+      <label>Teléfono / WhatsApp
+        <input name="phone" required type="tel" placeholder="Ej: +54 9 11 9876-5432">
+      </label>
+      <label>Correo electrónico (opcional)
+        <input name="email" type="email" placeholder="cliente@gmail.com">
+      </label>
+      <label class="wide">Observaciones / Notas
+        <textarea name="notes" rows="2" placeholder="Cliente recomendado, prefiere retiro tarde..."></textarea>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="primary">Guardar cliente</button>
+      </div>
+    </form>
+  `);
+
+  d.querySelector('#new-client-form').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await api(`/api/workshop/${currentSlug}/orders`, {
+        method: 'POST',
+        body: JSON.stringify({
+          client_id: 'NEW',
+          client_name: fd.get('name'),
+          client_phone: fd.get('phone'),
+          brand: 'Consulta',
+          model: 'General',
+          fault: 'Registro inicial de cliente'
+        })
+      });
+      toast('Cliente guardado con éxito');
+      d.close();
+      await loadWorkshop();
     } catch (err) {
       toast(err.message, true);
     }
+  };
+}
+
+// Modal nuevo movimiento de caja
+function openNewCashModal() {
+  const d = modal('＋ Nuevo movimiento de caja', `
+    <form id="new-cash-form" class="form-grid">
+      <label>Tipo de movimiento
+        <select name="type">
+          <option value="income">Ingreso (Cobro / Seña / Venta)</option>
+          <option value="expense">Egreso (Gasto / Pago repuesto)</option>
+        </select>
+      </label>
+      <label>Importe ($)
+        <input name="amount" type="number" step="0.01" min="1" required placeholder="Ej: 15000">
+      </label>
+      <label>Medio de pago
+        <select name="payment_method">
+          <option value="efectivo">💵 Efectivo</option>
+          <option value="mercadopago">⚡ Mercado Pago</option>
+          <option value="transferencia">🏦 Transferencia</option>
+          <option value="tarjeta">💳 Tarjeta</option>
+        </select>
+      </label>
+      <label>Concepto o descripción
+        <input name="concept" required placeholder="Ej: Cobro pantalla Motorola G84">
+      </label>
+      <div class="form-actions wide">
+        <button type="submit" class="primary">Registrar movimiento</button>
+      </div>
+    </form>
+  `);
+
+  d.querySelector('#new-cash-form').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await api(`/api/workshop/${currentSlug}/cash`, {
+        method: 'POST',
+        body: JSON.stringify(Object.fromEntries(fd))
+      });
+      toast('Movimiento registrado');
+      d.close();
+      await loadWorkshop();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  };
+}
+
+// Modal de soporte y reporte
+function openSupportModal() {
+  const appName = currentWorkshop?.name || 'Tu Taller Soft';
+  const text = `Hola Matías! Me comunico desde el taller "${appName}" (${location.origin}/t/${currentSlug}) para hacer una consulta técnica: `;
+  const wa = `https://wa.me/5491178200237?text=${encodeURIComponent(text)}`;
+  const mail = `mailto:soporte@tutallersoft.com?subject=${encodeURIComponent('Soporte · ' + appName)}&body=${encodeURIComponent(text)}`;
+
+  modal('Reportar un problema o pedir soporte', `
+    <p class="muted">Estamos a tu disposición para ayudarte con cualquier duda técnica o mejora que necesites en tu sistema.</p>
+    <div class="support-actions">
+      <a class="primary support-btn" href="${wa}" target="_blank" rel="noopener noreferrer">💬 Enviar WhatsApp a Matías</a>
+      <a class="secondary support-btn" href="${mail}">✉ Enviar correo electrónico</a>
+    </div>
+  `);
+}
+
+// Inicialización de eventos del shell
+function initEvents() {
+  // Navegación Sidebar y Mobile Bottom Nav
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => setSection(btn.dataset.section));
   });
 
-  // Onboarding Form
-  document.querySelector('#onboarding-form').addEventListener('submit', async e => {
+  // Buscador
+  const searchInput = document.querySelector('#search-input');
+  searchInput.addEventListener('input', e => {
+    searchQuery = e.target.value.trim();
+    if (activeSection === 'home') setSection('orders');
+    else renderCurrentSection();
+  });
+
+  // Filtro de órdenes
+  document.querySelector('#filter-order-status').addEventListener('change', e => {
+    orderStatusFilter = e.target.value;
+    renderOrders();
+  });
+
+  // Botones de acción rápida
+  document.querySelector('#btn-quick-new-order').onclick = openNewOrderModal;
+  document.querySelector('#btn-orders-new-order').onclick = openNewOrderModal;
+  document.querySelector('#btn-quick-client').onclick = openNewClientModal;
+  document.querySelector('#btn-clients-new').onclick = openNewClientModal;
+  document.querySelector('#btn-quick-orders').onclick = () => setSection('orders');
+  document.querySelector('#link-goto-orders').onclick = () => setSection('orders');
+  document.querySelector('#kpi-active-btn').onclick = () => { orderStatusFilter = 'in_progress'; setSection('orders'); };
+  document.querySelector('#kpi-ready-btn').onclick = () => { orderStatusFilter = 'ready'; setSection('orders'); };
+  document.querySelector('#kpi-parts-btn').onclick = () => { orderStatusFilter = 'waiting_parts'; setSection('orders'); };
+  document.querySelector('#kpi-clients-btn').onclick = () => setSection('clients');
+  document.querySelector('#card-pending-repairs').onclick = () => { orderStatusFilter = 'in_progress'; setSection('orders'); };
+  document.querySelector('#card-pending-ready').onclick = () => { orderStatusFilter = 'ready'; setSection('orders'); };
+  document.querySelector('#card-pending-parts').onclick = () => { orderStatusFilter = 'waiting_parts'; setSection('orders'); };
+
+  // Recargar y Ajustes
+  document.querySelector('#btn-reload').onclick = () => { toast('Actualizando datos...'); loadWorkshop(); };
+  document.querySelector('#btn-settings-header').onclick = () => setSection('settings');
+  document.querySelector('#brand-box').onclick = () => setSection('settings');
+  document.querySelector('#btn-report-issue').onclick = openSupportModal;
+  document.querySelector('#btn-cash-new').onclick = openNewCashModal;
+
+  // Onboarding Form (País y Pagos)
+  const onbForm = document.querySelector('#onboarding-form');
+  const onbModal = document.querySelector('#onboarding-modal');
+  document.querySelector('#close-onboarding-btn').onclick = () => onbModal.close();
+
+  onbForm.onsubmit = async e => {
     e.preventDefault();
     const country = document.querySelector('#onb-country').value;
-    const payments = [];
-    if (document.querySelector('#onb-mp').checked) payments.push('mercadopago');
-    if (document.querySelector('#onb-cash').checked) payments.push('efectivo');
-    if (document.querySelector('#onb-trans').checked) payments.push('transferencia');
-    if (document.querySelector('#onb-card').checked) payments.push('tarjeta');
+    const pms = Array.from(document.querySelectorAll('input[name="pm_onb"]:checked')).map(cb => cb.value).join(',');
 
     try {
       await api(`/api/workshop/${currentSlug}/onboarding`, {
         method: 'POST',
-        body: JSON.stringify({
-          country,
-          payment_methods: payments.join(','),
-          onboarding_completed: 1
-        })
+        body: JSON.stringify({ country, payment_methods: pms })
       });
-
-      toast('¡Configuración inicial guardada!');
+      toast('¡Configuración de país y medios de pago guardada!');
       onbModal.close();
       await loadWorkshop();
     } catch (err) {
       toast(err.message, true);
     }
-  });
+  };
 
-  // Importar Demo desde Navegador
-  async function importDemoData(payload) {
+  // Guardar datos de marca
+  document.querySelector('#form-settings-brand').onsubmit = async e => {
+    e.preventDefault();
+    toast('Datos de marca guardados');
+    updateBrandUI();
+  };
+
+  // Guardar medios de pago desde Configuración
+  document.querySelector('#form-settings-payments').onsubmit = async e => {
+    e.preventDefault();
+    const country = document.querySelector('#set-workshop-country').value;
+    const pms = Array.from(document.querySelectorAll('input[name="pm"]:checked')).map(cb => cb.value).join(',');
+
     try {
-      const res = await api(`/api/workshop/${currentSlug}/import-demo`, {
+      await api(`/api/workshop/${currentSlug}/onboarding`, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ country, payment_methods: pms })
       });
-      toast(`¡Migración exitosa! Se importaron ${res.imported_orders} órdenes y ${res.imported_clients} clientes.`);
+      toast('Medios de pago y país actualizados');
       await loadWorkshop();
-      return res;
     } catch (err) {
-      toast(`Error al importar: ${err.message}`, true);
-      throw err;
-    }
-  }
-
-  // Botón detectar demo en navegador
-  const detectDemoHandler = async () => {
-    const feedback = document.querySelector('#onb-demo-feedback') || document.querySelector('#import-status');
-    try {
-      // Buscar en localStorage llaves conocidas de la demo
-      let foundData = null;
-      for (const key of Object.keys(localStorage)) {
-        if (key.includes('rtc') || key.includes('demo') || key.includes('repair')) {
-          try {
-            const parsed = JSON.parse(localStorage.getItem(key));
-            if (parsed && (parsed.orders || parsed.clients || Array.isArray(parsed))) {
-              foundData = parsed;
-              break;
-            }
-          } catch {}
-        }
-      }
-
-      if (foundData) {
-        feedback.textContent = 'Encontrados datos de la demo. Migrando...';
-        await importDemoData(foundData);
-        feedback.textContent = '✅ Datos migrados correctamente.';
-      } else {
-        feedback.textContent = 'ℹ️ No se detectaron datos guardados en este navegador. Podés subir el archivo JSON de respaldo abajo.';
-      }
-    } catch (err) {
-      feedback.textContent = 'Error: ' + err.message;
+      toast(err.message, true);
     }
   };
 
-  const btnDetectDemo = document.querySelector('#btn-import-local-demo');
-  if (btnDetectDemo) btnDetectDemo.addEventListener('click', detectDemoHandler);
-  const btnOnbDetect = document.querySelector('#onb-detect-demo-btn');
-  if (btnOnbDetect) btnOnbDetect.addEventListener('click', detectDemoHandler);
+  // Importar Demo JSON
+  const importInput = document.querySelector('#import-json-file');
+  document.querySelector('#btn-import-demo-modal').onclick = () => {
+    importInput.value = '';
+    importInput.click();
+  };
 
-  // Subir archivo JSON de respaldo de la demo
-  const fileInput = document.querySelector('#demo-file-input');
-  if (fileInput) {
-    fileInput.addEventListener('change', async e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const json = JSON.parse(text);
-        document.querySelector('#import-status').textContent = 'Leyendo y migrando archivo...';
-        await importDemoData(json);
-        document.querySelector('#import-status').textContent = '✅ Archivo importado con éxito.';
-      } catch (err) {
-        document.querySelector('#import-status').textContent = 'Error al leer archivo: ' + err.message;
+  importInput.onchange = async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const orders = parsed.repair_orders || parsed.orders || [];
+      const clients = parsed.clients || [];
+
+      if (!orders.length && !clients.length) {
+        throw new Error('El archivo no contiene clientes ni órdenes válidas.');
       }
-    });
-  }
+
+      const res = await api(`/api/workshop/${currentSlug}/import-demo`, {
+        method: 'POST',
+        body: JSON.stringify({ clients, orders })
+      });
+
+      toast(`¡Importación exitosa! Se cargaron ${res.imported_orders} órdenes y ${res.imported_clients} clientes.`);
+      await loadWorkshop();
+      setSection('home');
+    } catch (err) {
+      toast(`Error al importar copia: ${err.message}`, true);
+    }
+  };
+}
+
+// Iniciar aplicación al cargar el DOM
+window.addEventListener('DOMContentLoaded', () => {
+  initEvents();
+  loadWorkshop();
 });

@@ -50,9 +50,9 @@ async function getAdminFromSession(request, env) {
     }
   }
 
-  // 3. Fallback de clave de administración para scripts autorizados
+  // 3. Clave de administración para scripts autorizados (solo si está configurada en variables de entorno)
   const adminKey = request.headers.get('X-Admin-Key');
-  if (adminKey && adminKey === (env.ADMIN_SECRET_KEY || 'tutaller-admin-2026')) {
+  if (adminKey && env.ADMIN_SECRET_KEY && adminKey === env.ADMIN_SECRET_KEY) {
     return { email: (env.SUPER_ADMIN_EMAIL || SUPER_ADMIN_DEFAULT).toLowerCase(), name: 'Matías Barrios' };
   }
 

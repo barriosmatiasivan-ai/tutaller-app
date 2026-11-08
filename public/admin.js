@@ -159,8 +159,16 @@ function renderWorkshops() {
       activityHtml = `<span class="activity-badge moderate">⚪ ${w.orders_this_week} órdenes/sem</span>`;
     }
 
-    // WhatsApp Directo
+    // Bandera de país
+    const countryFlags = {
+      AR: '🇦🇷 AR', MX: '🇲🇽 MX', CO: '🇨🇴 CO', CL: '🇨🇱 CL',
+      PE: '🇵🇪 PE', UY: '🇺🇾 UY', ES: '🇪🇸 ES', US: '🌐 Global'
+    };
+    const cBadge = `<span class="brand-badge" style="font-size:10px;padding:2px 6px;">${countryFlags[w.country] || '🇦🇷 AR'}</span>`;
+
+    // WhatsApp Directo y Bienvenida
     let waButton = '';
+    let welcomeButton = '';
     if (w.phone) {
       const cleanPhone = w.phone.replace(/[^0-9]/g, '');
       const waText = w.days_remaining <= 7
@@ -168,13 +176,22 @@ function renderWorkshops() {
         : `Hola ${w.name}! Te escribo del equipo de soporte de Tu Taller Soft para ver cómo viene funcionando el sistema en tu taller.`;
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`;
       waButton = `<a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="secondary" title="Enviar WhatsApp al dueño" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;">💬</a>`;
+
+      const welcomeText = `¡Hola ${w.name}! Te damos la bienvenida a Tu Taller Soft 🚀. Tu taller ya está habilitado con Plan ${w.plan === 'pro' ? 'Pro' : 'Básico'}. Podés ingresar desde tu celular o PC en: https://app.tutallersoft.com/t/${w.slug} ¡Guardalo en la pantalla de inicio como una app!`;
+      const welcomeUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(welcomeText)}`;
+      welcomeButton = `<a href="${welcomeUrl}" target="_blank" rel="noopener noreferrer" class="secondary" title="Enviar Bienvenida con enlace por WhatsApp" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;background:rgba(37, 211, 102, 0.15);color:#25d366;border-color:rgba(37, 211, 102, 0.3);">📲</a>`;
     }
+
+    const openLink = `<a href="/t/${w.slug}" target="_blank" class="secondary" title="Abrir Taller del Técnico" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;">🔗</a>`;
 
     return `
       <tr>
         <td>
-          <div class="workshop-name">${esc(w.name)}</div>
-          <div class="slug-badge">${esc(w.slug)}.tutallersoft.com</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="workshop-name">${esc(w.name)}</span>
+            ${cBadge}
+          </div>
+          <div class="slug-badge">app.tutallersoft.com/t/${esc(w.slug)}</div>
         </td>
         <td>
           <div><strong>${esc(w.owner_email)}</strong></div>
@@ -194,6 +211,8 @@ function renderWorkshops() {
         </td>
         <td>
           <div class="actions-cell">
+            ${openLink}
+            ${welcomeButton}
             ${waButton}
             <button class="secondary" onclick="openRenewModal('${w.id}', '${esc(w.name)}')" title="Renovar suscripción">📅 Renovar</button>
             <button class="secondary" onclick="toggleStatus('${w.id}', '${w.status}')" title="${w.status === 'active' ? 'Suspender taller' : 'Reactivar taller'}">
@@ -302,6 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         slug: document.querySelector('#new-slug').value.trim(),
         owner_email: document.querySelector('#new-email').value.trim(),
         phone: document.querySelector('#new-phone').value.trim(),
+        country: document.querySelector('#new-country').value,
         plan: document.querySelector('#new-plan').value,
         duration_days: document.querySelector('#new-duration').value,
         notes: document.querySelector('#new-notes').value.trim()

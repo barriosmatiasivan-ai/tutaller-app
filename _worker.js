@@ -184,6 +184,21 @@ export default {
         const existing = await db.prepare('SELECT id FROM workshops WHERE slug = ?').bind(slug).first();
         if (existing) return json({ error: `El identificador "${slug}" ya está en uso. Elegí otro slug.` }, 400);
 
+        const country = (body.country || 'AR').trim().toUpperCase();
+        const countryConfig = {
+          AR: { currency: 'ARS', payments: 'efectivo,mercadopago,transferencia,tarjeta' },
+          MX: { currency: 'MXN', payments: 'efectivo,mercadopago,transferencia,tarjeta' },
+          CO: { currency: 'COP', payments: 'efectivo,nequi,daviplata,transferencia,tarjeta' },
+          CL: { currency: 'CLP', payments: 'efectivo,webpay,transferencia,tarjeta' },
+          PE: { currency: 'PEN', payments: 'efectivo,yape,plin,transferencia,tarjeta' },
+          UY: { currency: 'UYU', payments: 'efectivo,prex,transferencia,tarjeta' },
+          ES: { currency: 'EUR', payments: 'efectivo,bizum,transferencia,tarjeta' },
+          US: { currency: 'USD', payments: 'efectivo,transferencia,tarjeta,stripe' }
+        };
+        const cfg = countryConfig[country] || countryConfig.AR;
+        const currency = cfg.currency;
+        const paymentMethods = cfg.payments;
+
         const id = crypto.randomUUID();
         const now = new Date();
         const nowIso = now.toISOString();
@@ -191,9 +206,9 @@ export default {
 
         await db.batch([
           db.prepare(`
-            INSERT INTO workshops (id, name, slug, owner_email, phone, address, plan, status, expires_at, notes, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-          `).bind(id, name, slug, ownerEmail, phone, address, plan, expiresAt, notes, nowIso, nowIso),
+            INSERT INTO workshops (id, name, slug, owner_email, phone, address, plan, status, expires_at, notes, country, currency, payment_methods, onboarding_completed, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 0, ?, ?)
+          `).bind(id, name, slug, ownerEmail, phone, address, plan, expiresAt, notes, country, currency, paymentMethods, nowIso, nowIso),
 
           db.prepare(`
             INSERT INTO workshop_users (id, workshop_id, email, name, role, created_at)
@@ -201,14 +216,14 @@ export default {
           `).bind(crypto.randomUUID(), id, ownerEmail, name, nowIso),
 
           db.prepare(`
-            INSERT INTO workshop_settings (workshop_id, name, phone, address, email, estimate_valid_days, warranty_days, warranty_terms, reception_terms, version, updated_at)
-            VALUES (?, ?, ?, ?, ?, 7, 30, ?, ?, 1, ?)
-          `).bind(id, name, phone, address, ownerEmail, `Garantía de 30 días de ${name} sobre la mano de obra y repuestos colocados.`, `Constancia de recepción de ${name} (Tel: ${phone || 'Contacto'}).`, nowIso)
+            INSERT INTO workshop_settings (workshop_id, name, phone, address, email, estimate_valid_days, warranty_days, warranty_terms, reception_terms, country, currency, payment_methods, version, updated_at)
+            VALUES (?, ?, ?, ?, ?, 7, 30, ?, ?, ?, ?, ?, 1, ?)
+          `).bind(id, name, phone, address, ownerEmail, `Garantía de 30 días de ${name} sobre la mano de obra y repuestos colocados.`, `Constancia de recepción de ${name} (Tel: ${phone || 'Contacto'}).`, country, currency, paymentMethods, nowIso)
         ]);
 
         return json({
           success: true,
-          workshop: { id, name, slug, owner_email: ownerEmail, plan, expires_at: expiresAt, status: 'active' }
+          workshop: { id, name, slug, owner_email: ownerEmail, plan, country, currency, payment_methods: paymentMethods, expires_at: expiresAt, status: 'active' }
         }, 201);
       }
 
@@ -298,6 +313,241 @@ export default {
         const result = await purgeOldOrderPhotos(env, 'manual');
         return json({ success: true, ...result });
       }
+    }
+
+    // Ruta de seguimiento público: /api/tracking/:token
+    if (url.pathname.startsWith('/api/tracking/')) {
+      const token = decodeURIComponent(url.pathname.replace('/api/tracking/', '')).trim();
+      const db = env.DB;
+      const order = await db.prepare(`
+        SELECT o.*, w.name as workshop_name, w.phone as workshop_phone
+        FROM repair_orders o
+        JOIN workshops w ON o.workshop_id = w.id
+        WHERE o.id = ? OR o.intake_key = ?
+      `).bind(token, token).first();
+
+      if (!order) return json({ error: 'Orden no encontrada' }, 404);
+      return json({
+        order,
+        workshop: { name: order.workshop_name, phone: order.workshop_phone }
+      });
+    }
+
+    // APIs Multi-Tenant para el Taller (/api/workshop/:slug/*)
+    if (url.pathname.startsWith('/api/workshop/')) {
+      const db = env.DB;
+      if (!db) return json({ error: 'Database binding missing' }, 500);
+
+      const parts = url.pathname.split('/');
+      const slug = parts[3];
+      const subRoute = parts.slice(4).join('/');
+
+      const workshop = await db.prepare('SELECT * FROM workshops WHERE slug = ?').bind(slug).first();
+      if (!workshop) return json({ error: 'Taller no encontrado' }, 404);
+
+      const now = Date.now();
+      const expiresMs = Date.parse(workshop.expires_at) || 0;
+      const daysRemaining = Math.max(0, Math.ceil((expiresMs - now) / 86400000));
+      const isExpired = expiresMs <= now;
+
+      // 1. Info básica
+      if (subRoute === 'info' && request.method === 'GET') {
+        return json({
+          workshop: {
+            ...workshop,
+            days_remaining: daysRemaining,
+            is_expired: isExpired
+          }
+        });
+      }
+
+      // 2. Datos completos para el panel
+      if (subRoute === 'data' && request.method === 'GET') {
+        const [settings, clientsRes, ordersRes, stockRes, cashRes] = await Promise.all([
+          db.prepare('SELECT * FROM workshop_settings WHERE workshop_id = ?').bind(workshop.id).first(),
+          db.prepare(`
+            SELECT c.*, (SELECT COUNT(*) FROM repair_orders ro WHERE ro.client_id = c.id) as order_count 
+            FROM clients c WHERE c.workshop_id = ? ORDER BY c.created_at DESC
+          `).bind(workshop.id).all(),
+          db.prepare(`
+            SELECT ro.*, c.name as client_name, c.phone as client_phone 
+            FROM repair_orders ro 
+            LEFT JOIN clients c ON ro.client_id = c.id 
+            WHERE ro.workshop_id = ? ORDER BY ro.order_number DESC
+          `).bind(workshop.id).all(),
+          db.prepare('SELECT * FROM stock_products WHERE workshop_id = ? ORDER BY name ASC').bind(workshop.id).all(),
+          db.prepare('SELECT * FROM cash_entries WHERE workshop_id = ? ORDER BY created_at DESC LIMIT 50').bind(workshop.id).all()
+        ]);
+
+        return json({
+          workshop: { ...workshop, days_remaining: daysRemaining, is_expired: isExpired },
+          settings: settings || {},
+          clients: clientsRes?.results || [],
+          orders: ordersRes?.results || [],
+          stock: stockRes?.results || [],
+          cash_entries: cashRes?.results || []
+        });
+      }
+
+      // 3. Onboarding inicial
+      if (subRoute === 'onboarding' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const country = (body.country || 'AR').trim().toUpperCase();
+        const countryConfig = {
+          AR: 'ARS', MX: 'MXN', CO: 'COP', CL: 'CLP', PE: 'PEN', UY: 'UYU', ES: 'EUR', US: 'USD'
+        };
+        const currency = countryConfig[country] || 'ARS';
+        const paymentMethods = body.payment_methods || 'efectivo,mercadopago,transferencia,tarjeta';
+        const nowIso = new Date().toISOString();
+
+        await db.batch([
+          db.prepare(`
+            UPDATE workshops 
+            SET country = ?, currency = ?, payment_methods = ?, onboarding_completed = 1, updated_at = ? 
+            WHERE id = ?
+          `).bind(country, currency, paymentMethods, nowIso, workshop.id),
+          db.prepare(`
+            UPDATE workshop_settings 
+            SET country = ?, currency = ?, payment_methods = ?, updated_at = ? 
+            WHERE workshop_id = ?
+          `).bind(country, currency, paymentMethods, nowIso, workshop.id)
+        ]);
+
+        return json({ success: true });
+      }
+
+      // 4. Importar datos de la demo de 48hs
+      if (subRoute === 'import-demo' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const demoClients = Array.isArray(body.clients) ? body.clients : [];
+        const demoOrders = Array.isArray(body.orders) ? body.orders : [];
+        const nowIso = new Date().toISOString();
+
+        let importedClients = 0;
+        let importedOrders = 0;
+        const clientMap = {};
+
+        for (const dc of demoClients) {
+          if (!dc.name) continue;
+          const cid = crypto.randomUUID();
+          clientMap[dc.id || dc.name] = cid;
+          await db.prepare(`
+            INSERT INTO clients (id, workshop_id, name, phone, email, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(cid, workshop.id, dc.name, dc.phone || '', dc.email || '', dc.notes || '', nowIso, nowIso).run();
+          importedClients++;
+        }
+
+        const maxRow = await db.prepare('SELECT MAX(order_number) as max_num FROM repair_orders WHERE workshop_id = ?').bind(workshop.id).first();
+        let nextNum = (maxRow?.max_num || 0) + 1;
+
+        for (const d of demoOrders) {
+          const oid = crypto.randomUUID();
+          const cid = clientMap[d.client_id || d.client_name] || null;
+          await db.prepare(`
+            INSERT INTO repair_orders (id, workshop_id, client_id, order_number, brand, model, identifier, fault, condition, accessories, status, diagnosis, intake_key, version, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+          `).bind(
+            oid, workshop.id, cid, nextNum++,
+            d.brand || 'Celular', d.model || 'Modelo', d.identifier || '',
+            d.fault || 'Revisión técnica', d.condition || '', d.accessories || '',
+            d.status || 'received', d.diagnosis || '', crypto.randomUUID().slice(0, 12),
+            nowIso, nowIso
+          ).run();
+          importedOrders++;
+        }
+
+        return json({ success: true, imported_clients: importedClients, imported_orders: importedOrders });
+      }
+
+      // 5. Crear orden
+      if (subRoute === 'orders' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        let clientId = body.client_id;
+        const nowIso = new Date().toISOString();
+
+        if (clientId === 'NEW' || !clientId) {
+          if (body.client_name) {
+            clientId = crypto.randomUUID();
+            await db.prepare(`
+              INSERT INTO clients (id, workshop_id, name, phone, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `).bind(clientId, workshop.id, body.client_name, body.client_phone || '', nowIso, nowIso).run();
+          } else {
+            clientId = null;
+          }
+        }
+
+        const maxRow = await db.prepare('SELECT MAX(order_number) as max_num FROM repair_orders WHERE workshop_id = ?').bind(workshop.id).first();
+        const orderNumber = (maxRow?.max_num || 0) + 1;
+        const orderId = crypto.randomUUID();
+        const intakeKey = crypto.randomUUID().slice(0, 12);
+
+        await db.prepare(`
+          INSERT INTO repair_orders (id, workshop_id, client_id, order_number, brand, model, identifier, fault, condition, accessories, status, intake_key, version, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, 1, ?, ?)
+        `).bind(
+          orderId, workshop.id, clientId, orderNumber,
+          body.brand || '', body.model || '', body.identifier || '',
+          body.fault || '', body.condition || '', body.accessories || '',
+          intakeKey, nowIso, nowIso
+        ).run();
+
+        return json({ success: true, id: orderId, order_number: orderNumber, intake_key: intakeKey }, 201);
+      }
+
+      // 6. Actualizar estado de orden
+      if (subRoute.startsWith('orders/') && subRoute.endsWith('/status') && request.method === 'PUT') {
+        const orderId = subRoute.split('/')[1];
+        const body = await request.json().catch(() => ({}));
+        const newStatus = body.status || 'received';
+        await db.prepare('UPDATE repair_orders SET status = ?, updated_at = ? WHERE id = ? AND workshop_id = ?')
+          .bind(newStatus, new Date().toISOString(), orderId, workshop.id).run();
+        return json({ success: true, status: newStatus });
+      }
+
+      // 7. Registrar caja
+      if (subRoute === 'cash' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const amount = Number(body.amount || 0);
+        const type = body.type === 'out' ? 'out' : 'in';
+        const method = body.payment_method || 'efectivo';
+        const concept = body.concept || 'Movimiento de caja';
+        const nowIso = new Date().toISOString();
+        const entryId = crypto.randomUUID();
+
+        await db.prepare(`
+          INSERT INTO cash_entries (id, workshop_id, amount, type, payment_method, concept, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(entryId, workshop.id, amount, type, method, concept, nowIso).run();
+
+        return json({ success: true, id: entryId }, 201);
+      }
+    }
+
+    // Ruta de seguimiento público: /seguimiento/:token
+    if (url.pathname.startsWith('/seguimiento/')) {
+      const trackingReq = new Request(new URL('/seguimiento/index.html', request.url), request);
+      return env.ASSETS.fetch(trackingReq);
+    }
+
+    // Ruta de acceso al taller del cliente: /t/:slug
+    const tMatch = url.pathname.match(/^\/t\/([a-zA-Z0-9-]+)\/?$/);
+    if (tMatch) {
+      const slug = tMatch[1];
+      const db = env.DB;
+      if (db) {
+        const w = await db.prepare('SELECT id, name, status, expires_at FROM workshops WHERE slug = ?').bind(slug).first();
+        if (!w) {
+          return new Response(`<!DOCTYPE html><html><body style="background:#0b1110;color:#fff;font-family:sans-serif;text-align:center;padding:60px 20px;"><div style="max-width:440px;margin:auto;background:#141f1c;padding:32px;border-radius:12px;border:1px solid #243b34;"><h2>Taller no encontrado</h2><p style="color:#9fb5a8;margin:12px 0 20px;">El taller "${slug}" no existe o fue dado de baja.</p><a href="https://tutallersoft.com" style="background:#10b981;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Ir a Tu Taller Soft</a></div></body></html>`, { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+        }
+        const isExpired = Date.parse(w.expires_at) <= Date.now();
+        if (w.status === 'suspended' || isExpired) {
+          return new Response(`<!DOCTYPE html><html><body style="background:#0b1110;color:#fff;font-family:sans-serif;text-align:center;padding:60px 20px;"><div style="max-width:440px;margin:auto;background:#141f1c;padding:32px;border-radius:12px;border:1px solid #ef4444;"><h2 style="color:#ef4444;margin-bottom:8px;">Taller Suspendido</h2><p style="color:#9fb5a8;line-height:1.5;">El acceso al taller <strong>${w.name}</strong> está pausado por vencimiento de suscripción.</p><p style="margin-top:18px;"><a href="https://wa.me/5491123456789?text=Hola!%20Quiero%20renovar%20la%20suscripci%C3%B3n%20de%20mi%20taller%20${w.name}" style="background:#10b981;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;">📲 Contactar para Reactivar</a></p></div></body></html>`, { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+        }
+      }
+      const tallerReq = new Request(new URL('/taller/index.html', request.url), request);
+      return env.ASSETS.fetch(tallerReq);
     }
 
     // Servir archivos estáticos del frontend

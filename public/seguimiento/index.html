@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seguimiento de Reparación · Tu Taller Soft</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><path d='M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z'/></svg>">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .tracking-container {
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+    .tracking-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .tracking-header {
+      text-align: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .workshop-badge {
+      display: inline-block;
+      background: var(--accent-light);
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .status-pill {
+      display: inline-block;
+      padding: 8px 18px;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 14px 0;
+    }
+    .status-ready { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .status-progress { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+    .status-parts { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+    .status-delivered { background: rgba(107, 114, 128, 0.2); color: #9ca3af; border: 1px solid #6b7280; }
+    .device-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 20px 0;
+    }
+    .info-box {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .info-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .info-val {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .contact-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: #25d366;
+      color: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      margin-top: 18px;
+    }
+    .contact-btn:hover { background: #1ebc59; }
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="tracking-container">
+    <div class="tracking-card" id="tracking-content">
+      <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <p>Buscando estado de tu reparación...</p>
+      </div>
+    </div>
+    <div class="footer-note">
+      Powered by <strong>Tu Taller Soft</strong> &bull; Sistema de Gestión y Trazabilidad Técnica
+    </div>
+  </div>
+
+  <script>
+    async function loadTracking() {
+      const parts = window.location.pathname.split('/');
+      const token = parts[parts.length - 1] || new URLSearchParams(window.location.search).get('token');
+      const container = document.querySelector('#tracking-content');
+
+      if (!token) {
+        container.innerHTML = '<p style="color:#ef4444;text-align:center;">Código de seguimiento no especificado.</p>';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/tracking/' + encodeURIComponent(token));
+        const data = await res.json();
+
+        if (!res.ok || !data.order) {
+          container.innerHTML = '<p style="color:#ef4444;text-align:center;">' + (data.error || 'No se encontró la orden solicitada.') + '</p>';
+          return;
+        }
+
+        const o = data.order;
+        const w = data.workshop || {};
+
+        let statusClass = 'status-progress';
+        let statusText = 'En Reparación';
+        if (o.status === 'ready') { statusClass = 'status-ready'; statusText = '¡Listo para Retirar!'; }
+        else if (o.status === 'waiting_parts') { statusClass = 'status-parts'; statusText = 'En espera de repuesto'; }
+        else if (o.status === 'delivered') { statusClass = 'status-delivered'; statusText = 'Entregado al cliente'; }
+        else if (o.status === 'received') { statusClass = 'status-progress'; statusText = 'Ingresado al taller'; }
+
+        let cleanPhone = (w.phone || '').replace(/[^0-9]/g, '');
+        let waLink = '';
+        if (cleanPhone) {
+          const msg = encodeURIComponent('Hola ' + (w.name || 'taller') + ', consulto por mi orden #' + o.order_number + ' (' + o.brand + ' ' + o.model + ')');
+          waLink = '<a href="https://wa.me/' + cleanPhone + '?text=' + msg + '" class="contact-btn" target="_blank" rel="noopener">💬 Consultar al Taller por WhatsApp</a>';
+        }
+
+        container.innerHTML = `
+          <div class="tracking-header">
+            <span class="workshop-badge">${esc(w.name || 'Tu Taller')}</span>
+            <div class="device-title">${esc(o.brand)} ${esc(o.model)}</div>
+            <p style="color:var(--text-muted);font-size:13px;margin-top:4px;">Orden N° <strong>#${o.order_number}</strong></p>
+            <div><span class="status-pill ${statusClass}">${statusText}</span></div>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-box">
+              <span class="info-label">Falla Declarada</span>
+              <span class="info-val">${esc(o.fault || 'Revisión técnica')}</span>
+            </div>
+            <div class="info-box">
+              <span class="info-label">Fecha de Ingreso</span>
+              <span class="info-val">${o.created_at ? new Date(o.created_at).toLocaleDateString('es-AR') : '-'}</span>
+            </div>
+          </div>
+
+          ${o.diagnosis ? `
+            <div class="info-box" style="margin-bottom:14px;">
+              <span class="info-label">Informe / Diagnóstico Técnico</span>
+              <span class="info-val" style="font-weight:400;">${esc(o.diagnosis)}</span>
+            </div>
+          ` : ''}
+
+          ${waLink}
+        `;
+      } catch (err) {
+        container.innerHTML = '<p style="color:#ef4444;text-align:center;">Error al conectar con el servidor.</p>';
+      }
+    }
+
+    function esc(s) {
+      if (!s) return '';
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    loadTracking();
+  </script>
+</body>
+</html>

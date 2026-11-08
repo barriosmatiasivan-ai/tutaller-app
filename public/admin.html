@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Admin · Tu Taller Soft</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
+</head>
+<body>
+  <div class="container">
+    <header class="admin-header">
+      <div class="brand">
+        <span class="brand-badge">Super-Admin</span>
+        <div>
+          <h1>Tu Taller Soft</h1>
+          <p class="admin-meta">Panel Central de Control y Gestión de Talleres Clientes</p>
+        </div>
+      </div>
+      <div>
+        <button class="primary" id="open-create-modal">
+          <span>＋</span> Habilitar Nuevo Taller
+        </button>
+      </div>
+    </header>
+
+    <!-- Key Metrics Grid -->
+    <section class="kpi-grid">
+      <div class="kpi-card accent">
+        <span class="kpi-title">Talleres Activos <span>🏢</span></span>
+        <span class="kpi-value" id="kpi-active">0</span>
+        <span class="kpi-desc" id="kpi-total-desc">Cargando datos...</span>
+      </div>
+      <div class="kpi-card warning">
+        <span class="kpi-title">Por Vencer (≤ 7 días) <span>⏳</span></span>
+        <span class="kpi-value" id="kpi-expiring">0</span>
+        <span class="kpi-desc">Requieren cobro de renovación</span>
+      </div>
+      <div class="kpi-card danger">
+        <span class="kpi-title">Suspendidos / Vencidos <span>⏸️</span></span>
+        <span class="kpi-value" id="kpi-suspended">0</span>
+        <span class="kpi-desc">Sin acceso a nuevas cargas</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-title">Órdenes Semanales <span>📦</span></span>
+        <span class="kpi-value" id="kpi-orders">0</span>
+        <span class="kpi-desc">Últimos 7 días en la plataforma</span>
+      </div>
+      <div class="kpi-card danger">
+        <span class="kpi-title">Alerta de Abandono <span>🚨</span></span>
+        <span class="kpi-value" id="kpi-churn">0</span>
+        <span class="kpi-desc">Talleres con caída de actividad</span>
+      </div>
+    </section>
+
+    <!-- Controls Toolbar -->
+    <div class="toolbar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Buscar taller, slug, correo o WhatsApp...">
+      </div>
+      <div class="filter-group">
+        <select id="filter-plan">
+          <option value="">Todos los planes</option>
+          <option value="basic">Plan Básico</option>
+          <option value="pro">Plan Pro</option>
+        </select>
+        <select id="filter-status">
+          <option value="">Todos los estados</option>
+          <option value="active">Solo Activos</option>
+          <option value="expiring">Por Vencer (≤ 7 días)</option>
+          <option value="suspended">Suspendidos / Vencidos</option>
+          <option value="churn_risk">Alerta de Abandono</option>
+        </select>
+        <button class="secondary" id="refresh-btn" title="Actualizar datos">↻ Actualizar</button>
+      </div>
+    </div>
+
+    <!-- Workshops Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Taller / Identificador</th>
+            <th>Dueño / Contacto</th>
+            <th>Plan</th>
+            <th>Estado</th>
+            <th>Vencimiento</th>
+            <th>Actividad Semanal</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="workshops-tbody">
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+              Cargando talleres registrados...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal: Crear Nuevo Taller -->
+  <dialog id="create-modal">
+    <div class="modal-header">
+      <h2>Habilitar Nuevo Taller</h2>
+      <button class="close-btn" id="close-create-modal">✕</button>
+    </div>
+    <form id="create-form">
+      <div class="form-group">
+        <label for="new-name">Nombre del Taller (Marca Comercial) *</label>
+        <input type="text" id="new-name" required placeholder="Ej: FixPoint Celulares">
+      </div>
+      <div class="form-group">
+        <label for="new-slug">Subdominio / Slug (Identificador único) *</label>
+        <input type="text" id="new-slug" required placeholder="Ej: fixpoint">
+      </div>
+      <div class="form-group">
+        <label for="new-email">Correo del Dueño (Acceso a su taller) *</label>
+        <input type="email" id="new-email" required placeholder="taller@ejemplo.com">
+      </div>
+      <div class="form-group">
+        <label for="new-phone">Teléfono o WhatsApp de contacto</label>
+        <input type="tel" id="new-phone" placeholder="Ej: +5491123456789">
+      </div>
+      <div class="form-group">
+        <label for="new-plan">Plan Contratado</label>
+        <select id="new-plan">
+          <option value="basic">Plan Básico ($12 USD / $18.000 ARS)</option>
+          <option value="pro" selected>Plan Pro ($20 USD / $30.000 ARS - Marca blanca y equipos propios)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="new-duration">Vigencia inicial de la suscripción</label>
+        <select id="new-duration">
+          <option value="30" selected>1 Mes (30 días)</option>
+          <option value="90">3 Meses (90 días)</option>
+          <option value="180">6 Meses (180 días)</option>
+          <option value="365">1 Año (365 días - Membresía Anual)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="new-notes">Notas internas (opcional)</label>
+        <textarea id="new-notes" rows="2" placeholder="Ej: Pagó por transferencia anual el 08/11"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="secondary" id="cancel-create-btn">Cancelar</button>
+        <button type="submit" class="primary">Guardar y Habilitar Taller</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Renovar Suscripción -->
+  <dialog id="renew-modal">
+    <div class="modal-header">
+      <h2>Renovar Suscripción</h2>
+      <button class="close-btn" id="close-renew-modal">✕</button>
+    </div>
+    <form id="renew-form">
+      <input type="hidden" id="renew-id">
+      <p id="renew-target-name" style="margin-bottom: 16px; font-weight: 700; color: #ffffff;"></p>
+      <div class="form-group">
+        <label for="renew-days">Tiempo de renovación a sumar</label>
+        <select id="renew-days">
+          <option value="30" selected>+ 1 Mes (30 días)</option>
+          <option value="90">+ 3 Meses (90 días)</option>
+          <option value="180">+ 6 Meses (180 días)</option>
+          <option value="365">+ 1 Año (365 días)</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="secondary" id="cancel-renew-btn">Cancelar</button>
+        <button type="submit" class="primary">Aplicar Renovación</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

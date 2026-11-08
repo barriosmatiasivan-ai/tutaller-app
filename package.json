@@ -1,0 +1,10 @@
+{
+  "name": "tutaller-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tu Taller Soft — Plataforma SaaS Multi-Tenant y Panel Super-Admin",
+  "scripts": {
+    "deploy": "npx wrangler pages deploy public --project-name tutaller-app --branch main"
+  }
+}

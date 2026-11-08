@@ -449,6 +449,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Toggle visibilidad de contraseña
+  const togglePwdBtn = document.querySelector('#toggle-pwd-btn');
+  const pwdInput = document.querySelector('#login-password');
+  if (togglePwdBtn && pwdInput) {
+    togglePwdBtn.addEventListener('click', () => {
+      const isPwd = pwdInput.type === 'password';
+      pwdInput.type = isPwd ? 'text' : 'password';
+      togglePwdBtn.textContent = isPwd ? '🙈' : '👁️';
+    });
+  }
+
   // Manejo de Inicio de Sesión
   const loginForm = document.querySelector('#login-form');
   if (loginForm) {
@@ -461,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
       submitBtn.textContent = 'Verificando... ⏳';
 
       const email = document.querySelector('#login-email').value.trim();
-      const password = document.querySelector('#login-password').value;
+      const password = document.querySelector('#login-password').value.trim();
 
       try {
         const res = await fetch('/api/admin/auth/login', {

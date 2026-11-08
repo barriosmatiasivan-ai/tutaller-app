@@ -23,7 +23,10 @@
         </div>
         <div class="form-group">
           <label for="login-password">Contraseña Maestra</label>
-          <input type="password" id="login-password" required placeholder="••••••••">
+          <div style="position:relative;display:flex;align-items:center;">
+            <input type="password" id="login-password" required placeholder="••••••••" style="padding-right:42px;width:100%;">
+            <button type="button" id="toggle-pwd-btn" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:var(--text-muted);" title="Mostrar / ocultar contraseña">👁️</button>
+          </div>
         </div>
         <div id="login-error" style="color: #ef4444; font-size: 13px; margin-bottom: 14px; display: none; font-weight: 600;"></div>
         <button type="submit" class="primary" id="login-submit-btn" style="width: 100%; padding: 13px; font-size: 15px; font-weight: 700;">

@@ -214,8 +214,8 @@ export default {
       // Endpoint de Login (Público)
       if (url.pathname === '/api/admin/auth/login' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));
-        const email = (body.email || '').trim().toLowerCase();
-        const password = body.password || '';
+        const rawPassword = body.password || '';
+        const password = rawPassword.trim();
 
         if (!email || !password) {
           return json({ error: 'Ingresá tu correo y contraseña.' }, 400);
@@ -226,8 +226,9 @@ export default {
           return json({ error: 'Credenciales inválidas. Verificá tu correo.' }, 401);
         }
 
-        const inputHash = await hashPassword(password);
-        if (!admin.password_hash || admin.password_hash !== inputHash) {
+        const inputHash = await hashPassword(rawPassword);
+        const trimmedHash = await hashPassword(password);
+        if (!admin.password_hash || (admin.password_hash !== inputHash && admin.password_hash !== trimmedHash)) {
           return json({ error: 'Contraseña incorrecta.' }, 401);
         }
 

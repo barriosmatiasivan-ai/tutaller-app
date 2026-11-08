@@ -41,6 +41,14 @@ const BRAND_ALIASES = {
   lg: ['lg']
 };
 
+function setText(selector, val) {
+  const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+  if (el) {
+    el.textContent = val !== null && val !== undefined ? String(val) : '';
+  }
+  return el;
+}
+
 function getBrandKey(brandStr) {
   if (!brandStr) return null;
   const lower = brandStr.toLowerCase().trim();
@@ -73,6 +81,7 @@ function getSlug() {
 
 function toast(msg, isErr = false) {
   const el = document.querySelector('#toast');
+  if (!el) return;
   el.textContent = msg;
   el.className = isErr ? 'show error' : 'show';
   clearTimeout(toast.timer);
@@ -108,6 +117,7 @@ async function api(path, options = {}) {
 
 function modal(title, content) {
   const d = document.querySelector('#app-modal');
+  if (!d) return null;
   d.innerHTML = `
     <div class="modal-heading">
       <h2>${title}</h2>
@@ -115,8 +125,8 @@ function modal(title, content) {
     </div>
     ${content}
   `;
-  d.querySelector('#close-app-modal').onclick = () => d.close();
-  d.showModal();
+  d.querySelector('#close-app-modal')?.addEventListener('click', () => d.close());
+  if (typeof d.showModal === 'function') d.showModal();
   return d;
 }
 
@@ -125,7 +135,7 @@ async function loadWorkshop() {
   currentSlug = getSlug();
   try {
     const dataRes = await api(`/api/workshop/${currentSlug}/data`);
-    currentWorkshop = dataRes.workshop;
+    currentWorkshop = dataRes.workshop || {};
     currentSettings = dataRes.settings || {};
     workshopData = {
       orders: dataRes.orders || [],
@@ -138,52 +148,52 @@ async function loadWorkshop() {
     updateHeaderUI();
 
     // Si aún no completó onboarding de país y métodos de pago
-    if (!currentWorkshop.onboarding_completed) {
-      document.querySelector('#onboarding-modal').showModal();
+    if (currentWorkshop && !currentWorkshop.onboarding_completed) {
+      document.querySelector('#onboarding-modal')?.showModal?.();
     }
 
     renderCurrentSection();
   } catch (err) {
+    console.error('Error al cargar taller:', err);
     toast(`Error al cargar taller: ${err.message}`, true);
-    document.querySelector('#home-title').textContent = 'Error al conectar con el taller';
+    setText('#home-title', 'Error al conectar con el taller');
   }
 }
 
 function updateBrandUI() {
+  if (!currentWorkshop) return;
   const name = currentWorkshop.name || 'Mi Taller';
   document.title = `${name} · Tu Taller`;
-  document.querySelector('#sidebar-workshop-title').textContent = name;
-  document.querySelector('#sidebar-plan-label').textContent = `Plan ${currentWorkshop.plan === 'pro' ? 'Pro' : 'Básico'} · ${currentWorkshop.days_remaining} días restantes`;
+  setText('#sidebar-workshop-title', name);
+  setText('#sidebar-plan-label', `Plan ${currentWorkshop.plan === 'pro' ? 'Pro' : 'Básico'} · ${currentWorkshop.days_remaining || 0} días restantes`);
 
   const logoImg = document.querySelector('#sidebar-logo');
   const mobLogo = document.querySelector('#mobile-logo');
-  if (currentSettings.logo_url) {
-    logoImg.src = currentSettings.logo_url;
-    mobLogo.src = currentSettings.logo_url;
-  } else {
-    logoImg.src = '/logo.png';
-    mobLogo.src = '/logo.png';
-  }
+  const url = currentSettings?.logo_url || '/logo.png';
+  if (logoImg) logoImg.src = url;
+  if (mobLogo) mobLogo.src = url;
 }
 
 function updateHeaderUI() {
+  if (!currentWorkshop) return;
   const country = (currentWorkshop.country || 'AR').toUpperCase();
-  document.querySelector('#header-country-pill').textContent = COUNTRY_FLAGS[country] || `🌍 ${country}`;
+  setText('#header-country-pill', COUNTRY_FLAGS[country] || `🌍 ${country}`);
 
   const pms = (currentWorkshop.payment_methods || 'efectivo,mercadopago,transferencia').split(',');
   const badgesContainer = document.querySelector('#header-payment-badges');
-  let badgesHtml = '';
-
-  if (pms.includes('mercadopago')) {
-    badgesHtml += `<span class="badge-mp">⚡ MP</span>`;
+  if (badgesContainer) {
+    let badgesHtml = '';
+    if (pms.includes('mercadopago')) {
+      badgesHtml += `<span class="badge-mp">⚡ MP</span>`;
+    }
+    if (pms.includes('efectivo')) {
+      badgesHtml += `<span class="badge-cash">💵 Efvo</span>`;
+    }
+    if (pms.includes('transferencia')) {
+      badgesHtml += `<span class="badge-transfer">🏦 Transf</span>`;
+    }
+    badgesContainer.innerHTML = badgesHtml;
   }
-  if (pms.includes('efectivo')) {
-    badgesHtml += `<span class="badge-cash">💵 Efvo</span>`;
-  }
-  if (pms.includes('transferencia')) {
-    badgesHtml += `<span class="badge-transfer">🏦 Transf</span>`;
-  }
-  badgesContainer.innerHTML = badgesHtml;
 }
 
 // Control de secciones
@@ -219,24 +229,26 @@ function renderHome() {
   const partsCount = orders.filter(o => o.status === 'waiting_parts').length;
   const debtCount = orders.filter(o => Number(o.balance_cents || 0) > 0 && o.status !== 'cancelled').length;
 
-  document.querySelector('#kpi-active-count').textContent = activeCount;
-  document.querySelector('#kpi-ready-count').textContent = readyCount;
-  document.querySelector('#kpi-parts-count').textContent = partsCount;
-  document.querySelector('#kpi-clients-count').textContent = clients.length;
+  setText('#kpi-active-count', activeCount);
+  setText('#kpi-ready-count', readyCount);
+  setText('#kpi-parts-count', partsCount);
+  setText('#kpi-clients-count', clients.length);
 
-  document.querySelector('#rev-active-count').textContent = activeCount;
-  document.querySelector('#rev-active-text').textContent = activeCount > 0 ? `${activeCount} en banco de trabajo` : '✓ Estás al día';
+  setText('#rev-active-count', activeCount);
+  setText('#rev-active-text', activeCount > 0 ? `${activeCount} en banco de trabajo` : '✓ Estás al día');
 
-  document.querySelector('#rev-ready-count').textContent = readyCount;
-  document.querySelector('#rev-ready-text').textContent = readyCount > 0 ? `${readyCount} por avisar / retirar` : '✓ Estás al día';
+  setText('#rev-ready-count', readyCount);
+  setText('#rev-ready-text', readyCount > 0 ? `${readyCount} por avisar / retirar` : '✓ Estás al día');
 
-  document.querySelector('#rev-parts-count').textContent = partsCount;
-  document.querySelector('#rev-parts-text').textContent = partsCount > 0 ? `${partsCount} pendientes de compra` : '✓ Estás al día';
+  setText('#rev-parts-count', partsCount);
+  setText('#rev-parts-text', partsCount > 0 ? `${partsCount} pendientes de compra` : '✓ Estás al día');
 
-  document.querySelector('#rev-debt-count').textContent = debtCount;
-  document.querySelector('#rev-debt-text').textContent = debtCount > 0 ? `${debtCount} con saldo pendiente` : '✓ Estás al día';
+  setText('#rev-debt-count', debtCount);
+  setText('#rev-debt-text', debtCount > 0 ? `${debtCount} con saldo pendiente` : '✓ Estás al día');
 
   const homeContainer = document.querySelector('#home-orders-container');
+  if (!homeContainer) return;
+
   const ongoing = orders.filter(o => !['delivered', 'cancelled'].includes(o.status));
 
   if (ongoing.length === 0) {
@@ -262,6 +274,7 @@ function renderHome() {
 // 2. Render Órdenes
 function renderOrders() {
   const container = document.querySelector('#orders-full-container');
+  if (!container) return;
   let list = workshopData.orders || [];
 
   if (orderStatusFilter) {
@@ -320,7 +333,7 @@ function orderCardHtml(order) {
       </div>
       <div class="order-actions-btns" onclick="event.stopPropagation();">
         ${order.client_phone ? `
-          <a class="order-action-icon" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}, te escribimos de ${currentWorkshop.name} sobre tu orden #${order.order_number} (${order.brand} ${order.model}): estado actual: ${st.label}.`)}" target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp al cliente">
+          <a class="order-action-icon" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}, te escribimos de ${currentWorkshop?.name || 'el taller'} sobre tu orden #${order.order_number} (${order.brand} ${order.model}): estado actual: ${st.label}.`)}" target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp al cliente">
             💬
           </a>
         ` : ''}
@@ -386,7 +399,7 @@ function openOrderDetailModal(order) {
       ${order.client_phone ? `
         <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);">
           <label>Aviso rápido por WhatsApp</label>
-          <a class="primary" style="margin-top:8px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop.name} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
+          <a class="primary" style="margin-top:8px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop?.name || 'el taller'} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
             💬 Notificar al cliente por WhatsApp
           </a>
         </div>
@@ -394,7 +407,9 @@ function openOrderDetailModal(order) {
     </div>
   `);
 
-  d.querySelector('#order-status-form').onsubmit = async e => {
+  if (!d) return;
+
+  d.querySelector('#order-status-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const newStatus = d.querySelector('#edit-order-status').value;
     try {
@@ -409,12 +424,13 @@ function openOrderDetailModal(order) {
     } catch (err) {
       toast(err.message, true);
     }
-  };
+  });
 }
 
 // 3. Render Clientes
 function renderClients() {
   const container = document.querySelector('#clients-container');
+  if (!container) return;
   let list = workshopData.clients || [];
 
   if (searchQuery) {
@@ -450,6 +466,7 @@ function renderClients() {
 // 4. Render Stock
 function renderStock() {
   const container = document.querySelector('#stock-container');
+  if (!container) return;
   const items = workshopData.stock || [];
 
   if (items.length === 0) {
@@ -479,7 +496,6 @@ function renderStock() {
 
 // 5. Render Caja
 function renderCash() {
-  const container = document.querySelector('#cash-container');
   const entries = workshopData.cash_entries || [];
 
   let income = 0;
@@ -496,10 +512,13 @@ function renderCash() {
     }
   }
 
-  document.querySelector('#cash-income-total').textContent = formatMoney(income);
-  document.querySelector('#cash-expense-total').textContent = formatMoney(expense);
-  document.querySelector('#cash-mp-total').textContent = formatMoney(mpTotal);
-  document.querySelector('#cash-net-total').textContent = formatMoney(income - expense);
+  setText('#cash-income-total', formatMoney(income));
+  setText('#cash-expense-total', formatMoney(expense));
+  setText('#cash-mp-total', formatMoney(mpTotal));
+  setText('#cash-net-total', formatMoney(income - expense));
+
+  const container = document.querySelector('#cash-container');
+  if (!container) return;
 
   if (entries.length === 0) {
     container.innerHTML = `
@@ -533,20 +552,28 @@ function renderCash() {
 
 // 6. Render Configuración
 function renderSettings() {
-  document.querySelector('#set-workshop-name').value = currentWorkshop.name || '';
-  document.querySelector('#set-workshop-phone').value = currentWorkshop.phone || '';
-  document.querySelector('#set-workshop-address').value = currentWorkshop.address || '';
-  document.querySelector('#set-workshop-logo-url').value = currentSettings.logo_url || '';
+  const setVal = (sel, v) => {
+    const el = document.querySelector(sel);
+    if (el) el.value = v || '';
+  };
+  setVal('#set-workshop-name', currentWorkshop?.name);
+  setVal('#set-workshop-phone', currentWorkshop?.phone);
+  setVal('#set-workshop-address', currentWorkshop?.address);
+  setVal('#set-workshop-logo-url', currentSettings?.logo_url);
 
-  const country = (currentWorkshop.country || 'AR').toUpperCase();
-  document.querySelector('#set-workshop-country').value = country;
-  document.querySelector('#set-workshop-currency').value = COUNTRY_CURRENCY[country] || 'ARS';
+  const country = (currentWorkshop?.country || 'AR').toUpperCase();
+  setVal('#set-workshop-country', country);
+  setVal('#set-workshop-currency', COUNTRY_CURRENCY[country] || 'ARS');
 
-  const pms = (currentWorkshop.payment_methods || 'efectivo,mercadopago,transferencia').split(',');
-  document.querySelector('#pm-mercadopago').checked = pms.includes('mercadopago');
-  document.querySelector('#pm-efectivo').checked = pms.includes('efectivo');
-  document.querySelector('#pm-transferencia').checked = pms.includes('transferencia');
-  document.querySelector('#pm-tarjeta').checked = pms.includes('tarjeta');
+  const pms = (currentWorkshop?.payment_methods || 'efectivo,mercadopago,transferencia').split(',');
+  const setChk = (sel, chk) => {
+    const el = document.querySelector(sel);
+    if (el) el.checked = chk;
+  };
+  setChk('#pm-mercadopago', pms.includes('mercadopago'));
+  setChk('#pm-efectivo', pms.includes('efectivo'));
+  setChk('#pm-transferencia', pms.includes('transferencia'));
+  setChk('#pm-tarjeta', pms.includes('tarjeta'));
 }
 
 // Modal nuevo equipo
@@ -605,18 +632,22 @@ function openNewOrderModal() {
     </form>
   `);
 
+  if (!d) return;
+
   const clientSel = d.querySelector('#intake-client-select');
   const newClientBlock = d.querySelector('#new-client-inputs');
-  clientSel.onchange = () => {
-    const isNew = clientSel.value === 'NEW';
-    newClientBlock.style.display = isNew ? 'grid' : 'none';
-    newClientBlock.querySelectorAll('input').forEach(inp => inp.required = isNew);
-  };
+  if (clientSel && newClientBlock) {
+    clientSel.onchange = () => {
+      const isNew = clientSel.value === 'NEW';
+      newClientBlock.style.display = isNew ? 'grid' : 'none';
+      newClientBlock.querySelectorAll('input').forEach(inp => inp.required = isNew);
+    };
+  }
 
-  d.querySelector('#new-intake-form').onsubmit = async e => {
+  d.querySelector('#new-intake-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const btn = d.querySelector('#btn-submit-order');
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
     const fd = new FormData(e.target);
     const payload = Object.fromEntries(fd);
 
@@ -631,9 +662,9 @@ function openNewOrderModal() {
     } catch (err) {
       toast(err.message, true);
     } finally {
-      btn.disabled = false;
+      if (btn) btn.disabled = false;
     }
-  };
+  });
 }
 
 // Modal nuevo cliente
@@ -658,7 +689,9 @@ function openNewClientModal() {
     </form>
   `);
 
-  d.querySelector('#new-client-form').onsubmit = async e => {
+  if (!d) return;
+
+  d.querySelector('#new-client-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
     try {
@@ -679,7 +712,7 @@ function openNewClientModal() {
     } catch (err) {
       toast(err.message, true);
     }
-  };
+  });
 }
 
 // Modal nuevo movimiento de caja
@@ -712,7 +745,9 @@ function openNewCashModal() {
     </form>
   `);
 
-  d.querySelector('#new-cash-form').onsubmit = async e => {
+  if (!d) return;
+
+  d.querySelector('#new-cash-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
     try {
@@ -726,7 +761,7 @@ function openNewCashModal() {
     } catch (err) {
       toast(err.message, true);
     }
-  };
+  });
 }
 
 // Modal de soporte y reporte
@@ -754,48 +789,53 @@ function initEvents() {
 
   // Buscador
   const searchInput = document.querySelector('#search-input');
-  searchInput.addEventListener('input', e => {
+  searchInput?.addEventListener('input', e => {
     searchQuery = e.target.value.trim();
     if (activeSection === 'home') setSection('orders');
     else renderCurrentSection();
   });
 
   // Filtro de órdenes
-  document.querySelector('#filter-order-status').addEventListener('change', e => {
+  document.querySelector('#filter-order-status')?.addEventListener('change', e => {
     orderStatusFilter = e.target.value;
     renderOrders();
   });
 
-  // Botones de acción rápida
-  document.querySelector('#btn-quick-new-order').onclick = openNewOrderModal;
-  document.querySelector('#btn-orders-new-order').onclick = openNewOrderModal;
-  document.querySelector('#btn-quick-client').onclick = openNewClientModal;
-  document.querySelector('#btn-clients-new').onclick = openNewClientModal;
-  document.querySelector('#btn-quick-orders').onclick = () => setSection('orders');
-  document.querySelector('#link-goto-orders').onclick = () => setSection('orders');
-  document.querySelector('#kpi-active-btn').onclick = () => { orderStatusFilter = 'in_progress'; setSection('orders'); };
-  document.querySelector('#kpi-ready-btn').onclick = () => { orderStatusFilter = 'ready'; setSection('orders'); };
-  document.querySelector('#kpi-parts-btn').onclick = () => { orderStatusFilter = 'waiting_parts'; setSection('orders'); };
-  document.querySelector('#kpi-clients-btn').onclick = () => setSection('clients');
-  document.querySelector('#card-pending-repairs').onclick = () => { orderStatusFilter = 'in_progress'; setSection('orders'); };
-  document.querySelector('#card-pending-ready').onclick = () => { orderStatusFilter = 'ready'; setSection('orders'); };
-  document.querySelector('#card-pending-parts').onclick = () => { orderStatusFilter = 'waiting_parts'; setSection('orders'); };
+  // Botones de acción rápida con optional chaining
+  document.querySelector('#btn-quick-new-order')?.addEventListener('click', openNewOrderModal);
+  document.querySelector('#btn-orders-new-order')?.addEventListener('click', openNewOrderModal);
+  document.querySelector('#btn-quick-client')?.addEventListener('click', openNewClientModal);
+  document.querySelector('#btn-clients-new')?.addEventListener('click', openNewClientModal);
+  document.querySelector('#btn-quick-orders')?.addEventListener('click', () => setSection('orders'));
+  document.querySelector('#link-goto-orders')?.addEventListener('click', () => setSection('orders'));
+
+  // Tarjetas KPI como filtros directos
+  document.querySelector('#kpi-active-btn')?.addEventListener('click', () => { orderStatusFilter = 'in_progress'; setSection('orders'); });
+  document.querySelector('#kpi-ready-btn')?.addEventListener('click', () => { orderStatusFilter = 'ready'; setSection('orders'); });
+  document.querySelector('#kpi-parts-btn')?.addEventListener('click', () => { orderStatusFilter = 'waiting_parts'; setSection('orders'); });
+  document.querySelector('#kpi-clients-btn')?.addEventListener('click', () => setSection('clients'));
+
+  // Tarjetas "Para revisar hoy"
+  document.querySelector('#card-pending-repairs')?.addEventListener('click', () => { orderStatusFilter = 'in_progress'; setSection('orders'); });
+  document.querySelector('#card-pending-ready')?.addEventListener('click', () => { orderStatusFilter = 'ready'; setSection('orders'); });
+  document.querySelector('#card-pending-parts')?.addEventListener('click', () => { orderStatusFilter = 'waiting_parts'; setSection('orders'); });
+  document.querySelector('#card-pending-debts')?.addEventListener('click', () => setSection('cash'));
 
   // Recargar y Ajustes
-  document.querySelector('#btn-reload').onclick = () => { toast('Actualizando datos...'); loadWorkshop(); };
-  document.querySelector('#btn-settings-header').onclick = () => setSection('settings');
-  document.querySelector('#brand-box').onclick = () => setSection('settings');
-  document.querySelector('#btn-report-issue').onclick = openSupportModal;
-  document.querySelector('#btn-cash-new').onclick = openNewCashModal;
+  document.querySelector('#btn-reload')?.addEventListener('click', () => { toast('Actualizando datos...'); loadWorkshop(); });
+  document.querySelector('#btn-settings-header')?.addEventListener('click', () => setSection('settings'));
+  document.querySelector('#brand-box')?.addEventListener('click', () => setSection('settings'));
+  document.querySelector('#btn-report-issue')?.addEventListener('click', openSupportModal);
+  document.querySelector('#btn-cash-new')?.addEventListener('click', openNewCashModal);
 
   // Onboarding Form (País y Pagos)
   const onbForm = document.querySelector('#onboarding-form');
   const onbModal = document.querySelector('#onboarding-modal');
-  document.querySelector('#close-onboarding-btn').onclick = () => onbModal.close();
+  document.querySelector('#close-onboarding-btn')?.addEventListener('click', () => onbModal?.close?.());
 
-  onbForm.onsubmit = async e => {
+  onbForm?.addEventListener('submit', async e => {
     e.preventDefault();
-    const country = document.querySelector('#onb-country').value;
+    const country = document.querySelector('#onb-country')?.value || 'AR';
     const pms = Array.from(document.querySelectorAll('input[name="pm_onb"]:checked')).map(cb => cb.value).join(',');
 
     try {
@@ -804,24 +844,24 @@ function initEvents() {
         body: JSON.stringify({ country, payment_methods: pms })
       });
       toast('¡Configuración de país y medios de pago guardada!');
-      onbModal.close();
+      onbModal?.close?.();
       await loadWorkshop();
     } catch (err) {
       toast(err.message, true);
     }
-  };
+  });
 
   // Guardar datos de marca
-  document.querySelector('#form-settings-brand').onsubmit = async e => {
+  document.querySelector('#form-settings-brand')?.addEventListener('submit', async e => {
     e.preventDefault();
     toast('Datos de marca guardados');
     updateBrandUI();
-  };
+  });
 
   // Guardar medios de pago desde Configuración
-  document.querySelector('#form-settings-payments').onsubmit = async e => {
+  document.querySelector('#form-settings-payments')?.addEventListener('submit', async e => {
     e.preventDefault();
-    const country = document.querySelector('#set-workshop-country').value;
+    const country = document.querySelector('#set-workshop-country')?.value || 'AR';
     const pms = Array.from(document.querySelectorAll('input[name="pm"]:checked')).map(cb => cb.value).join(',');
 
     try {
@@ -834,16 +874,18 @@ function initEvents() {
     } catch (err) {
       toast(err.message, true);
     }
-  };
+  });
 
   // Importar Demo JSON
   const importInput = document.querySelector('#import-json-file');
-  document.querySelector('#btn-import-demo-modal').onclick = () => {
-    importInput.value = '';
-    importInput.click();
-  };
+  document.querySelector('#btn-import-demo-modal')?.addEventListener('click', () => {
+    if (importInput) {
+      importInput.value = '';
+      importInput.click();
+    }
+  });
 
-  importInput.onchange = async e => {
+  importInput?.addEventListener('change', async e => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -867,11 +909,17 @@ function initEvents() {
     } catch (err) {
       toast(`Error al importar copia: ${err.message}`, true);
     }
-  };
+  });
 }
 
-// Iniciar aplicación al cargar el DOM
-window.addEventListener('DOMContentLoaded', () => {
+// Iniciar aplicación al cargar el DOM con soporte para carga diferida o asíncrona
+function bootApp() {
   initEvents();
   loadWorkshop();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootApp);
+} else {
+  bootApp();
+}

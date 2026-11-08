@@ -279,6 +279,7 @@ tr:hover td {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .badge.active { background: var(--accent-light); color: var(--accent); }
@@ -312,8 +313,8 @@ tr:hover td {
 
 .actions-cell {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 5px;
 }
 
 /* Modals */

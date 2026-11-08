@@ -174,11 +174,9 @@ function renderWorkshops() {
     const isLifetime = w.plan === 'lifetime' || w.is_lifetime;
     if (w.status === 'suspended') {
       statusBadge = '<span class="badge suspended">⏸️ Suspendido</span>';
-    } else if (isLifetime) {
-      statusBadge = '<span class="badge active" style="background:rgba(16, 185, 129, 0.2);color:#10b981;border:1px solid rgba(16, 185, 129, 0.35);">✓ Vitalicio Activo</span>';
     } else if (w.is_expired) {
       statusBadge = '<span class="badge suspended">⌛ Vencido</span>';
-    } else if (w.days_remaining <= 7) {
+    } else if (!isLifetime && w.days_remaining <= 7) {
       statusBadge = `<span class="badge expiring">⏳ Vence en ${w.days_remaining}d</span>`;
     } else {
       statusBadge = '<span class="badge active">✓ Activo</span>';
@@ -217,15 +215,15 @@ function renderWorkshops() {
           ? `Hola ${w.name}! Te escribo de Tu Taller Soft para avisarte que tu suscripción vence en ${w.days_remaining} días. ¿Querés renovar para continuar sin interrupciones?`
           : `Hola ${w.name}! Te escribo del equipo de soporte de Tu Taller Soft para ver cómo viene funcionando el sistema en tu taller.`;
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`;
-      waButton = `<a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="secondary" title="Enviar WhatsApp al dueño" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;">💬</a>`;
+      waButton = `<a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="secondary" title="Enviar WhatsApp al dueño" style="text-decoration:none;display:inline-flex;align-items:center;padding:5px 8px;font-size:13px;">💬</a>`;
 
-      const planLabel = w.plan === 'lifetime' ? 'Vitalicio 👑 (Acceso Permanente)' : w.plan === 'pro' ? 'Pro ⭐' : 'Básico';
+      const planLabel = isLifetime ? 'Pro Vitalicio 👑' : w.plan === 'pro' ? 'Pro ⭐' : 'Básico';
       const welcomeText = `¡Hola ${w.name}! Te damos la bienvenida a Tu Taller Soft 🚀. Tu taller ya está habilitado con Plan ${planLabel}. Podés ingresar desde tu celular o PC en: https://app.tutallersoft.com/t/${w.slug} ¡Guardalo en la pantalla de inicio como una app!`;
       const welcomeUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(welcomeText)}`;
-      welcomeButton = `<a href="${welcomeUrl}" target="_blank" rel="noopener noreferrer" class="secondary" title="Enviar Bienvenida con enlace por WhatsApp" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;background:rgba(37, 211, 102, 0.15);color:#25d366;border-color:rgba(37, 211, 102, 0.3);">📲</a>`;
+      welcomeButton = `<a href="${welcomeUrl}" target="_blank" rel="noopener noreferrer" class="secondary" title="Enviar Bienvenida con enlace por WhatsApp" style="text-decoration:none;display:inline-flex;align-items:center;padding:5px 8px;background:rgba(37, 211, 102, 0.15);color:#25d366;border-color:rgba(37, 211, 102, 0.3);font-size:13px;">📲</a>`;
     }
 
-    const openLink = `<a href="/t/${w.slug}" target="_blank" class="secondary" title="Abrir Taller del Técnico" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;">🔗</a>`;
+    const openLink = `<a href="/t/${w.slug}" target="_blank" class="secondary" title="Abrir Taller del Técnico" style="text-decoration:none;display:inline-flex;align-items:center;padding:5px 8px;font-size:13px;">🔗</a>`;
 
     return `
       <tr>
@@ -240,34 +238,34 @@ function renderWorkshops() {
           <div><strong>${esc(w.owner_email)}</strong></div>
           <div style="font-size:12px;color:var(--text-muted);">${esc(w.phone || 'Sin teléfono')}</div>
         </td>
-        <td>${planBadge}</td>
-        <td>${statusBadge}</td>
+        <td style="white-space:nowrap;">${planBadge}</td>
+        <td style="white-space:nowrap;">${statusBadge}</td>
         <td>
           ${isLifetime
-            ? '<div style="font-weight:700;color:#fbbf24;">👑 Acceso Vitalicio</div><div style="font-size:11px;color:#10b981;font-weight:600;">✓ Sin vencimiento</div>'
-            : `<div>${formatDate(w.expires_at)}</div>
-               <div style="font-size:11px;color:${w.days_remaining <= 7 ? 'var(--warning)' : 'var(--text-muted)'};">
+            ? '<div style="font-weight:700;color:#ffffff;white-space:nowrap;">Permanente</div><div style="font-size:11px;color:#10b981;font-weight:600;white-space:nowrap;">✓ Vitalicio</div>'
+            : `<div style="white-space:nowrap;">${formatDate(w.expires_at)}</div>
+               <div style="font-size:11px;color:${w.days_remaining <= 7 ? 'var(--warning)' : 'var(--text-muted)'};white-space:nowrap;">
                  ${w.is_expired ? 'Vencido' : `${w.days_remaining} días restantes`}
                </div>`
           }
         </td>
         <td>
           ${activityHtml}
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Total: ${w.total_orders || 0} órdenes · ${w.client_count || 0} clientes</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap;">Total: ${w.total_orders || 0} órdenes · ${w.client_count || 0} clientes</div>
         </td>
         <td>
           <div class="actions-cell">
-            ${openLink}
-            ${welcomeButton}
-            ${waButton}
-            <button class="secondary" onclick="openRenewModal('${w.id}', '${esc(w.name)}')" title="Renovar suscripción">📅 Renovar</button>
-            <button class="secondary" onclick="toggleStatus('${w.id}', '${w.status}')" title="${w.status === 'active' ? 'Suspender taller' : 'Reactivar taller'}">
-              ${w.status === 'active' ? '⏸️' : '▶️'}
-            </button>
-            <button class="secondary" onclick="openPlanModal('${w.id}', '${esc(w.name)}', '${w.plan}')" title="Cambiar nivel de plan (Básico / Pro)">
-              🏷️ Plan
-            </button>
-            <button class="secondary" onclick="deleteWorkshop('${w.id}', '${esc(w.name)}')" title="Eliminar taller" style="color:#ef4444;">🗑️</button>
+            <div style="display:flex;gap:5px;align-items:center;">
+              ${openLink}
+              ${welcomeButton}
+              ${waButton}
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;">
+              <button class="secondary" onclick="openRenewModal('${w.id}', '${esc(w.name)}')" title="Renovar suscripción" style="padding:4px 7px;font-size:12px;white-space:nowrap;">📅 Renovar</button>
+              <button class="secondary" onclick="openPlanModal('${w.id}', '${esc(w.name)}', '${w.plan}')" title="Cambiar nivel de plan" style="padding:4px 7px;font-size:12px;white-space:nowrap;">🏷️ Plan</button>
+              <button class="secondary" onclick="toggleStatus('${w.id}', '${w.status}')" title="${w.status === 'active' ? 'Suspender taller' : 'Reactivar taller'}" style="padding:4px 7px;font-size:12px;">${w.status === 'active' ? '⏸️' : '▶️'}</button>
+              <button class="secondary" onclick="deleteWorkshop('${w.id}', '${esc(w.name)}')" title="Eliminar taller" style="color:#ef4444;padding:4px 7px;font-size:12px;">🗑️</button>
+            </div>
           </div>
         </td>
       </tr>

@@ -388,9 +388,9 @@ export default {
         const ownerEmail = (body.owner_email || '').trim().toLowerCase();
         const phone = (body.phone || '').trim();
         const address = (body.address || '').trim();
-        const plan = ['basic', 'pro', 'lifetime'].includes(body.plan) ? body.plan : 'basic';
+        const plan = body.plan === 'pro' ? 'pro' : 'basic';
+        const isLifetime = body.duration_days === 'lifetime' || parseInt(body.duration_days, 10) >= 36500;
         const durationDays = parseInt(body.duration_days, 10) || 30;
-        const isLifetime = plan === 'lifetime' || durationDays >= 36500;
         const notes = (body.notes || '').trim();
 
         if (!name || name.length < 2) return json({ error: 'El nombre del taller es obligatorio (mínimo 2 caracteres).' }, 400);
@@ -454,64 +454,44 @@ export default {
         return json({ success: true, status: newStatus });
       }
 
-      // 5. Renovar suscripción (+días)
+      // 5. Renovar suscripción (tiempo / vigencia)
       if (url.pathname.match(/^\/api\/admin\/workshops\/[^/]+\/renew$/) && request.method === 'POST') {
         const id = url.pathname.split('/')[4];
         const body = await request.json().catch(() => ({}));
-        const addDays = parseInt(body.days, 10) || 30;
+        const rawDays = body.days;
 
-        if (addDays >= 36500) {
-          const newExpiresAt = '2099-12-31T23:59:59.000Z';
-          await db.prepare('UPDATE workshops SET expires_at = ?, plan = ?, status = ?, updated_at = ? WHERE id = ?')
-            .bind(newExpiresAt, 'lifetime', 'active', new Date().toISOString(), id).run();
-          return json({ success: true, expires_at: newExpiresAt, plan: 'lifetime' });
+        let newExpiresAt;
+        if (rawDays === 'lifetime' || parseInt(rawDays, 10) >= 36500) {
+          newExpiresAt = '2099-12-31T23:59:59.000Z';
+        } else {
+          const addDays = parseInt(rawDays, 10) || 30;
+          const current = await db.prepare('SELECT expires_at FROM workshops WHERE id = ?').bind(id).first();
+          if (!current) return json({ error: 'Taller no encontrado' }, 404);
+
+          const currentMs = Date.parse(current.expires_at) || 0;
+          const isCurLifetime = currentMs > Date.parse('2090-01-01');
+          const baseMs = isCurLifetime ? Date.now() : Math.max(Date.now(), currentMs);
+          newExpiresAt = new Date(baseMs + addDays * 86400000).toISOString();
         }
 
-        const current = await db.prepare('SELECT expires_at FROM workshops WHERE id = ?').bind(id).first();
-        if (!current) return json({ error: 'Taller no encontrado' }, 404);
-
-        const currentMs = Date.parse(current.expires_at) || 0;
-        const baseMs = Math.max(Date.now(), currentMs);
-        const newExpiresAt = new Date(baseMs + addDays * 86400000).toISOString();
-
+        // Renovar actualiza expires_at y activa el taller, sin alterar el plan
         await db.prepare('UPDATE workshops SET expires_at = ?, status = ?, updated_at = ? WHERE id = ?')
           .bind(newExpiresAt, 'active', new Date().toISOString(), id).run();
 
         return json({ success: true, expires_at: newExpiresAt });
       }
 
-      // 6. Cambiar plan (basic / pro / lifetime) y vigencia
+      // 6. Cambiar nivel de plan (basic / pro)
       if (url.pathname.match(/^\/api\/admin\/workshops\/[^/]+\/plan$/) && request.method === 'POST') {
         const id = url.pathname.split('/')[4];
         const body = await request.json().catch(() => ({}));
-        const newPlan = ['basic', 'pro', 'lifetime'].includes(body.plan) ? body.plan : 'pro';
-        const duration = body.duration || 'keep';
+        const newPlan = body.plan === 'pro' ? 'pro' : 'basic';
 
-        const current = await db.prepare('SELECT plan, expires_at, status FROM workshops WHERE id = ?').bind(id).first();
-        if (!current) return json({ error: 'Taller no encontrado' }, 404);
+        // Solo cambia el plan de software, sin tocar jamás expires_at
+        await db.prepare('UPDATE workshops SET plan = ?, updated_at = ? WHERE id = ?')
+          .bind(newPlan, new Date().toISOString(), id).run();
 
-        const currentMs = Date.parse(current.expires_at) || 0;
-        const isCurrentLifetime = current.plan === 'lifetime' || currentMs > Date.parse('2090-01-01');
-
-        let newExpiresAt = current.expires_at;
-
-        if (newPlan === 'lifetime' || duration === 'lifetime') {
-          newExpiresAt = '2099-12-31T23:59:59.000Z';
-        } else if (duration !== 'keep') {
-          const days = parseInt(duration, 10);
-          if (days > 0) {
-            newExpiresAt = new Date(Date.now() + days * 86400000).toISOString();
-          }
-        } else if (!isCurrentLifetime && currentMs <= Date.now()) {
-          // Si estaba vencido y no se especificó duración, darle 30 días
-          newExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
-        }
-        // Si newPlan es 'pro' o 'basic' y duration es 'keep' y ya era permanente, newExpiresAt se CONSERVA en 2099
-
-        await db.prepare('UPDATE workshops SET plan = ?, expires_at = ?, status = ?, updated_at = ? WHERE id = ?')
-          .bind(newPlan, newExpiresAt, 'active', new Date().toISOString(), id).run();
-
-        return json({ success: true, plan: newPlan, expires_at: newExpiresAt });
+        return json({ success: true, plan: newPlan });
       }
 
       // 7. Eliminar taller
@@ -595,9 +575,10 @@ export default {
 
       const now = Date.now();
       const expiresMs = Date.parse(workshop.expires_at) || 0;
-      const isLifetime = workshop.plan === 'lifetime' || (expiresMs && expiresMs > Date.parse('2090-01-01'));
+      const isLifetime = (expiresMs && expiresMs > Date.parse('2090-01-01')) || workshop.plan === 'lifetime';
       const daysRemaining = isLifetime ? 99999 : Math.max(0, Math.ceil((expiresMs - now) / 86400000));
       const isExpired = isLifetime ? false : expiresMs <= now;
+      const effectivePlan = workshop.plan === 'lifetime' ? 'pro' : workshop.plan;
 
       await ensureAuthSchema(db);
 
@@ -616,7 +597,7 @@ export default {
             id: workshop.id,
             name: workshop.name,
             slug: workshop.slug,
-            plan: workshop.plan,
+            plan: effectivePlan,
             is_lifetime: isLifetime,
             country: workshop.country,
             currency: workshop.currency,
@@ -757,7 +738,7 @@ export default {
         ]);
 
         return json({
-          workshop: { ...workshop, is_lifetime: isLifetime, days_remaining: daysRemaining, is_expired: isExpired },
+          workshop: { ...workshop, plan: effectivePlan, is_lifetime: isLifetime, days_remaining: daysRemaining, is_expired: isExpired },
           settings: settings || {},
           clients: clientsRes?.results || [],
           orders: ordersRes?.results || [],

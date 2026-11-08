@@ -145,10 +145,11 @@ function renderWorkshops() {
     // Filtro de Plan
     if (filterPlan && w.plan !== filterPlan) return false;
 
-    // Filtro de Estado
+    // Filtro de Estado / Vigencia
     if (filterStatus) {
       if (filterStatus === 'active' && (w.status !== 'active' || w.is_expired)) return false;
-      if (filterStatus === 'expiring' && (w.status !== 'active' || w.days_remaining > 7 || w.days_remaining <= 0)) return false;
+      if (filterStatus === 'lifetime' && !(w.plan === 'lifetime' || w.is_lifetime)) return false;
+      if (filterStatus === 'expiring' && (w.status !== 'active' || w.is_lifetime || w.days_remaining > 7 || w.days_remaining <= 0)) return false;
       if (filterStatus === 'suspended' && (w.status === 'active' && !w.is_expired)) return false;
       if (filterStatus === 'churn_risk' && w.activity_status !== 'churn_risk') return false;
     }
@@ -183,12 +184,10 @@ function renderWorkshops() {
       statusBadge = '<span class="badge active">✓ Activo</span>';
     }
 
-    // Badge de plan
-    const planBadge = isLifetime
-      ? '<span class="badge lifetime" title="Acceso Permanente sin vencimiento">👑 Pro Vitalicio</span>'
-      : w.plan === 'pro' 
-        ? '<span class="badge pro">⭐ Plan Pro</span>' 
-        : '<span class="badge basic">Plan Básico</span>';
+    // Badge de plan (Solo Básico vs Pro)
+    const planBadge = w.plan === 'pro'
+      ? '<span class="badge pro">⭐ Plan Pro</span>' 
+      : '<span class="badge basic">🥉 Plan Básico</span>';
 
     // Actividad semanal
     let activityHtml = '';
@@ -245,7 +244,7 @@ function renderWorkshops() {
         <td>${statusBadge}</td>
         <td>
           ${isLifetime
-            ? '<div style="font-weight:700;color:#ffffff;">Permanente</div><div style="font-size:11px;color:#10b981;font-weight:600;">✓ Sin vencimiento</div>'
+            ? '<div style="font-weight:700;color:#fbbf24;">👑 Acceso Vitalicio</div><div style="font-size:11px;color:#10b981;font-weight:600;">✓ Sin vencimiento</div>'
             : `<div>${formatDate(w.expires_at)}</div>
                <div style="font-size:11px;color:${w.days_remaining <= 7 ? 'var(--warning)' : 'var(--text-muted)'};">
                  ${w.is_expired ? 'Vencido' : `${w.days_remaining} días restantes`}
@@ -265,7 +264,7 @@ function renderWorkshops() {
             <button class="secondary" onclick="toggleStatus('${w.id}', '${w.status}')" title="${w.status === 'active' ? 'Suspender taller' : 'Reactivar taller'}">
               ${w.status === 'active' ? '⏸️' : '▶️'}
             </button>
-            <button class="secondary" onclick="openPlanModal('${w.id}', '${esc(w.name)}', '${w.plan}', ${isLifetime})" title="Modificar plan y vigencia">
+            <button class="secondary" onclick="openPlanModal('${w.id}', '${esc(w.name)}', '${w.plan}')" title="Cambiar nivel de plan (Básico / Pro)">
               🏷️ Plan
             </button>
             <button class="secondary" onclick="deleteWorkshop('${w.id}', '${esc(w.name)}')" title="Eliminar taller" style="color:#ef4444;">🗑️</button>
@@ -294,17 +293,16 @@ window.toggleStatus = async function(id, currentStatus) {
   }
 };
 
-window.openPlanModal = function(id, name, currentPlan, isLifetime) {
+window.openPlanModal = function(id, name, currentPlan) {
   document.querySelector('#plan-target-id').value = id;
-  const currentLabel = isLifetime ? '👑 Pro Vitalicio (Permanente)' : currentPlan === 'pro' ? '⭐ Pro' : '🥉 Básico';
-  document.querySelector('#plan-target-name').textContent = `${name} · Actual: ${currentLabel}`;
-  document.querySelector('#plan-select').value = isLifetime ? 'lifetime' : (currentPlan || 'pro');
-  document.querySelector('#plan-duration').value = isLifetime ? 'lifetime' : 'keep';
+  const currentLabel = currentPlan === 'pro' ? '⭐ Plan Pro' : '🥉 Plan Básico';
+  document.querySelector('#plan-target-name').textContent = `${name} · Nivel actual: ${currentLabel}`;
+  document.querySelector('#plan-select').value = currentPlan === 'pro' ? 'pro' : 'basic';
   document.querySelector('#plan-modal').showModal();
 };
 
 window.togglePlan = function(id, currentPlan) {
-  window.openPlanModal(id, '', currentPlan, currentPlan === 'lifetime');
+  window.openPlanModal(id, '', currentPlan);
 };
 
 window.openRenewModal = function(id, name) {
@@ -438,19 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Modal Cambiar Plan
+  // Modal Cambiar Plan (Nivel de software: basic vs pro)
   const planModal = document.querySelector('#plan-modal');
   if (planModal) {
     document.querySelector('#close-plan-modal')?.addEventListener('click', () => planModal.close());
     document.querySelector('#cancel-plan-btn')?.addEventListener('click', () => planModal.close());
-
-    document.querySelector('#plan-select')?.addEventListener('change', e => {
-      const dur = document.querySelector('#plan-duration');
-      if (!dur) return;
-      if (e.target.value === 'lifetime') {
-        dur.value = 'lifetime';
-      }
-    });
 
     document.querySelector('#plan-form')?.addEventListener('submit', async e => {
       e.preventDefault();
@@ -459,15 +449,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const id = document.querySelector('#plan-target-id').value;
       const plan = document.querySelector('#plan-select').value;
-      const duration = document.querySelector('#plan-duration').value;
-      const planNames = { lifetime: '👑 Pro Vitalicio (Permanente)', pro: '⭐ Pro', basic: '🥉 Básico' };
+      const planNames = { pro: '⭐ Plan Pro', basic: '🥉 Plan Básico' };
 
       try {
         await api(`/api/admin/workshops/${id}/plan`, {
           method: 'POST',
-          body: JSON.stringify({ plan, duration })
+          body: JSON.stringify({ plan })
         });
-        toast(`¡Plan y vigencia actualizados a ${planNames[plan] || plan} con éxito!`);
+        toast(`¡Plan actualizado a ${planNames[plan] || plan} con éxito!`);
         planModal.close();
         await loadData();
       } catch (err) {

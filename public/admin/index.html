@@ -104,13 +104,13 @@
       <div class="filter-group">
         <select id="filter-plan">
           <option value="">Todos los planes</option>
-          <option value="basic">Plan Básico</option>
-          <option value="pro">Plan Pro</option>
-          <option value="lifetime">👑 Plan Vitalicio</option>
+          <option value="basic">🥉 Plan Básico</option>
+          <option value="pro">⭐ Plan Pro</option>
         </select>
         <select id="filter-status">
           <option value="">Todos los estados</option>
           <option value="active">Solo Activos</option>
+          <option value="lifetime">👑 Solo Vitalicios</option>
           <option value="expiring">Por Vencer (≤ 7 días)</option>
           <option value="suspended">Suspendidos / Vencidos</option>
           <option value="churn_risk">Alerta de Abandono</option>
@@ -219,11 +219,10 @@
         </select>
       </div>
       <div class="form-group">
-        <label for="new-plan">Plan Contratado</label>
+        <label for="new-plan">Plan de Software</label>
         <select id="new-plan">
-          <option value="basic">Plan Básico ($12 USD / $18.000 ARS)</option>
-          <option value="pro" selected>Plan Pro ($20 USD / $30.000 ARS - Marca blanca y equipos propios)</option>
-          <option value="lifetime">👑 Plan Vitalicio (Pago único · Acceso permanente sin vencimiento)</option>
+          <option value="basic">🥉 Plan Básico ($12 USD / $18.000 ARS)</option>
+          <option value="pro" selected>⭐ Plan Pro ($20 USD / $30.000 ARS - Marca blanca y comprobantes QR)</option>
         </select>
       </div>
       <div class="form-group">
@@ -233,7 +232,7 @@
           <option value="90">3 Meses (90 días)</option>
           <option value="180">6 Meses (180 días)</option>
           <option value="365">1 Año (365 días - Membresía Anual)</option>
-          <option value="36500">👑 Permanente / Sin vencimiento (Plan Vitalicio)</option>
+          <option value="lifetime">👑 Acceso Vitalicio (Permanente / Sin vencimiento)</option>
         </select>
       </div>
       <div class="form-group">
@@ -257,13 +256,13 @@
       <input type="hidden" id="renew-id">
       <p id="renew-target-name" style="margin-bottom: 16px; font-weight: 700; color: #ffffff;"></p>
       <div class="form-group">
-        <label for="renew-days">Tiempo de renovación a sumar</label>
+        <label for="renew-days">Tiempo de vigencia a aplicar</label>
         <select id="renew-days">
           <option value="30" selected>+ 1 Mes (30 días)</option>
           <option value="90">+ 3 Meses (90 días)</option>
           <option value="180">+ 6 Meses (180 días)</option>
           <option value="365">+ 1 Año (365 días)</option>
-          <option value="36500">👑 Convertir a Vitalicio (Acceso permanente sin vencimiento)</option>
+          <option value="lifetime">👑 Acceso Vitalicio (Permanente / Sin vencimiento)</option>
         </select>
       </div>
       <div class="modal-footer">
@@ -296,9 +295,9 @@
   </dialog>
 
   <!-- Modal: Cambiar Plan -->
-  <dialog id="plan-modal" style="max-width:440px;">
+  <dialog id="plan-modal" style="max-width:420px;">
     <div class="modal-header">
-      <h2>Modificar Plan y Vigencia</h2>
+      <h2>Cambiar Plan</h2>
       <button class="close-btn" id="close-plan-modal">✕</button>
     </div>
     <form id="plan-form">
@@ -306,29 +305,20 @@
       <p id="plan-target-name" style="margin-bottom: 16px; font-weight: 700; color: #ffffff;"></p>
       
       <div class="form-group">
-        <label for="plan-select">Plan de Funcionalidades</label>
+        <label for="plan-select">Nivel de Plan (Funcionalidades)</label>
         <select id="plan-select" required>
+          <option value="basic">🥉 Plan Básico (Gestión de órdenes, clientes y caja)</option>
           <option value="pro">⭐ Plan Pro (Marca blanca, logo, QR y comprobantes)</option>
-          <option value="lifetime">👑 Plan Pro Vitalicio (Permanente · Pago único)</option>
-          <option value="basic">🥉 Plan Básico (Gestión técnica estándar)</option>
         </select>
       </div>
 
-      <div class="form-group" id="plan-duration-group">
-        <label for="plan-duration">Vigencia / Vencimiento</label>
-        <select id="plan-duration">
-          <option value="keep" selected>Mantener fecha actual de vencimiento</option>
-          <option value="lifetime">👑 Permanente / Sin vencimiento (Acceso de por vida)</option>
-          <option value="30">1 Mes (30 días)</option>
-          <option value="90">3 Meses (90 días)</option>
-          <option value="180">6 Meses (180 días)</option>
-          <option value="365">1 Año (365 días)</option>
-        </select>
-      </div>
+      <p style="font-size:12px; color:var(--text-muted); margin-top:8px; line-height:1.4;">
+        ℹ️ Este cambio solo modifica el tipo de plan. No altera la fecha de vencimiento ni la vigencia actual.
+      </p>
 
       <div class="modal-footer">
         <button type="button" class="secondary" id="cancel-plan-btn">Cancelar</button>
-        <button type="submit" class="primary">Guardar Cambios</button>
+        <button type="submit" class="primary">Guardar Plan</button>
       </div>
     </form>
   </dialog>
@@ -336,6 +326,6 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="/admin.js?v=20261108_final"></script>
+  <script src="/admin.js?v=20261108_v5"></script>
 </body>
 </html>

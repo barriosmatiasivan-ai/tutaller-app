@@ -134,7 +134,7 @@ function showWorkshopApp() {
   const loginView = document.querySelector('#workshop-login-view');
   const appLayout = document.querySelector('#app-layout');
   if (loginView) loginView.style.display = 'none';
-  if (appLayout) appLayout.style.display = 'flex';
+  if (appLayout) appLayout.style.display = '';
 }
 
 async function api(path, options = {}) {

@@ -295,14 +295,14 @@ export default {
 
         const [totalRes, activeRes, expiringRes, suspendedRes, weekOrdersRes] = await Promise.all([
           db.prepare('SELECT COUNT(*) as count FROM workshops').first(),
-          db.prepare().bind(nowIso).first(),
-          db.prepare().bind(nowIso, in7Days).first(),
-          db.prepare('SELECT COUNT(*) as count FROM workshops WHERE status = "suspended" OR expires_at <= ?').bind(nowIso).first(),
+          db.prepare('SELECT COUNT(*) as count FROM workshops WHERE status = ? AND expires_at > ?').bind('active', nowIso).first(),
+          db.prepare('SELECT COUNT(*) as count FROM workshops WHERE status = ? AND expires_at BETWEEN ? AND ?').bind('active', nowIso, in7Days).first(),
+          db.prepare('SELECT COUNT(*) as count FROM workshops WHERE status = ? OR expires_at <= ?').bind('suspended', nowIso).first(),
           db.prepare('SELECT COUNT(*) as count FROM repair_orders WHERE created_at >= ?').bind(sevenDaysAgo).first()
         ]);
 
         // Talleres con alerta de abandono (talleres activos con caída de órdenes en última semana)
-        const workshops = (await db.prepare().bind(nowIso).all()).results || [];
+        const workshops = (await db.prepare('SELECT id, name FROM workshops WHERE status = ? AND expires_at > ?').bind('active', nowIso).all()).results || [];
         let churnRiskCount = 0;
 
         for (const w of workshops) {
@@ -462,8 +462,8 @@ export default {
 
         if (addDays >= 36500) {
           const newExpiresAt = '2099-12-31T23:59:59.000Z';
-          await db.prepare()
-            .bind(newExpiresAt, new Date().toISOString(), id).run();
+          await db.prepare('UPDATE workshops SET expires_at = ?, plan = ?, status = ?, updated_at = ? WHERE id = ?')
+            .bind(newExpiresAt, 'lifetime', 'active', new Date().toISOString(), id).run();
           return json({ success: true, expires_at: newExpiresAt, plan: 'lifetime' });
         }
 
@@ -474,8 +474,8 @@ export default {
         const baseMs = Math.max(Date.now(), currentMs);
         const newExpiresAt = new Date(baseMs + addDays * 86400000).toISOString();
 
-        await db.prepare()
-          .bind(newExpiresAt, new Date().toISOString(), id).run();
+        await db.prepare('UPDATE workshops SET expires_at = ?, status = ?, updated_at = ? WHERE id = ?')
+          .bind(newExpiresAt, 'active', new Date().toISOString(), id).run();
 
         return json({ success: true, expires_at: newExpiresAt });
       }
@@ -487,8 +487,8 @@ export default {
         const newPlan = ['basic', 'pro', 'lifetime'].includes(body.plan) ? body.plan : 'basic';
         if (newPlan === 'lifetime') {
           const newExpiresAt = '2099-12-31T23:59:59.000Z';
-          await db.prepare()
-            .bind(newPlan, newExpiresAt, new Date().toISOString(), id).run();
+          await db.prepare('UPDATE workshops SET plan = ?, expires_at = ?, status = ?, updated_at = ? WHERE id = ?')
+            .bind(newPlan, newExpiresAt, 'active', new Date().toISOString(), id).run();
         } else {
           await db.prepare('UPDATE workshops SET plan = ?, updated_at = ? WHERE id = ?')
             .bind(newPlan, new Date().toISOString(), id).run();

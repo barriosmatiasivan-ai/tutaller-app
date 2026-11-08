@@ -98,46 +98,60 @@ async function sendResendPinEmail(toEmail, pinCode, workshopName, env) {
     return { success: true, simulated: true };
   }
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
+  const emailHtml = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1110; color: #f1f5f9; padding: 40px 20px; text-align: center;">
+      <div style="max-width: 480px; margin: 0 auto; background-color: #101613; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 16px; padding: 36px 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+        <div style="display: inline-block; padding: 6px 14px; background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 9999px; font-size: 12px; font-weight: 700; color: #10b981; letter-spacing: 1px; margin-bottom: 20px;">
+          CÓDIGO DE SEGURIDAD
+        </div>
+        <h2 style="color: #ffffff; font-size: 24px; margin: 0 0 8px 0; font-weight: 800;">${workshopName}</h2>
+        <p style="color: #94a3b8; font-size: 14px; margin: 0 0 28px 0; line-height: 1.5;">
+          Ingresá este código de 6 dígitos en tu pantalla para acceder al panel del taller:
+        </p>
+        
+        <div style="background: #131e18; border: 2px solid #10b981; border-radius: 12px; padding: 18px 24px; margin-bottom: 28px; font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #10b981; font-family: monospace;">
+          ${pinCode}
+        </div>
+        
+        <p style="color: #64748b; font-size: 12px; margin: 0; line-height: 1.5;">
+          Este código expira en 15 minutos por seguridad.<br>
+          Si no solicitaste este acceso, podés ignorar este mensaje con total tranquilidad.
+        </p>
+      </div>
+      <p style="margin-top: 24px; font-size: 11px; color: #475569;">
+        Tu Taller Soft · Sistema de Gestión y Trazabilidad Técnica
+      </p>
+    </div>
+  `;
+
+  async function postResend(fromAddress) {
+    return fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: env.EMAIL_FROM || 'Tu Taller Soft <acceso@tutallersoft.com>',
+        from: fromAddress,
         to: [toEmail],
         subject: `${pinCode} es tu código de acceso · ${workshopName}`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1110; color: #f1f5f9; padding: 40px 20px; text-align: center;">
-            <div style="max-width: 480px; margin: 0 auto; background-color: #101613; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 16px; padding: 36px 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
-              <div style="display: inline-block; padding: 6px 14px; background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 9999px; font-size: 12px; font-weight: 700; color: #10b981; letter-spacing: 1px; margin-bottom: 20px;">
-                CÓDIGO DE SEGURIDAD
-              </div>
-              <h2 style="color: #ffffff; font-size: 24px; margin: 0 0 8px 0; font-weight: 800;">${workshopName}</h2>
-              <p style="color: #94a3b8; font-size: 14px; margin: 0 0 28px 0; line-height: 1.5;">
-                Ingresá este código de 6 dígitos en tu pantalla para acceder al panel del taller:
-              </p>
-              
-              <div style="background: #131e18; border: 2px solid #10b981; border-radius: 12px; padding: 18px 24px; margin-bottom: 28px; font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #10b981; font-family: monospace;">
-                ${pinCode}
-              </div>
-              
-              <p style="color: #64748b; font-size: 12px; margin: 0; line-height: 1.5;">
-                Este código expira en 15 minutos por seguridad.<br>
-                Si no solicitaste este acceso, podés ignorar este mensaje con total tranquilidad.
-              </p>
-            </div>
-            <p style="margin-top: 24px; font-size: 11px; color: #475569;">
-              Tu Taller Soft · Sistema de Gestión y Trazabilidad Técnica
-            </p>
-          </div>
-        `
+        html: emailHtml
       })
     });
+  }
 
-    const data = await res.json().catch(() => ({}));
+  try {
+    const primaryFrom = env.EMAIL_FROM || 'Tu Taller Soft <acceso@tutallersoft.com>';
+    let res = await postResend(primaryFrom);
+    let data = await res.json().catch(() => ({}));
+
+    // Fallback automático a onboarding@resend.dev si tutallersoft.com aún no terminó de verificar DNS
+    if (!res.ok && data.message && data.message.includes('not verified')) {
+      console.log('Dominio tutallersoft.com aún no verificado en Resend. Usando remitente seguro onboarding@resend.dev...');
+      res = await postResend('Tu Taller Soft <onboarding@resend.dev>');
+      data = await res.json().catch(() => ({}));
+    }
+
     if (!res.ok) {
       console.error('Error enviando con Resend:', data);
       return { success: false, error: data.message || 'Error en Resend' };

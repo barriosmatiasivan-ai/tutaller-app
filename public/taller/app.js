@@ -105,11 +105,53 @@ function formatMoney(amount, currency = null) {
   return `${sym} ${num.toLocaleString('es-AR')}`;
 }
 
+function getWorkshopToken() {
+  return localStorage.getItem('tutaller_session_' + currentSlug) || '';
+}
+
+function setWorkshopToken(token) {
+  localStorage.setItem('tutaller_session_' + currentSlug, token);
+}
+
+function clearWorkshopToken() {
+  localStorage.removeItem('tutaller_session_' + currentSlug);
+}
+
+function showWorkshopLogin() {
+  const loginView = document.querySelector('#workshop-login-view');
+  const appLayout = document.querySelector('#app-layout');
+  if (loginView) loginView.style.display = 'flex';
+  if (appLayout) appLayout.style.display = 'none';
+
+  if (currentWorkshop) {
+    setText('#login-workshop-name', currentWorkshop.name || 'Tu Taller');
+    const logoEl = document.querySelector('#login-workshop-logo');
+    if (logoEl && currentWorkshop.logo_url) logoEl.src = currentWorkshop.logo_url;
+  }
+}
+
+function showWorkshopApp() {
+  const loginView = document.querySelector('#workshop-login-view');
+  const appLayout = document.querySelector('#app-layout');
+  if (loginView) loginView.style.display = 'none';
+  if (appLayout) appLayout.style.display = 'flex';
+}
+
 async function api(path, options = {}) {
+  const token = getWorkshopToken();
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    },
     ...options
   });
+  if (res.status === 401 && !path.includes('/auth/')) {
+    clearWorkshopToken();
+    showWorkshopLogin();
+    throw new Error('Sesión expirada. Ingresá con tu PIN.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Error en la solicitud');
   return data;
@@ -134,8 +176,36 @@ function modal(title, content) {
 async function loadWorkshop() {
   currentSlug = getSlug();
   try {
+    // 1. Cargar info básica pública (nombre, logo, país para la cabecera o login)
+    const infoRes = await fetch(`/api/workshop/${currentSlug}/info`).then(r => r.json()).catch(() => null);
+    if (infoRes && infoRes.workshop) {
+      currentWorkshop = infoRes.workshop;
+      setText('#login-workshop-name', currentWorkshop.name);
+      if (currentWorkshop.logo_url) {
+        const logoEl = document.querySelector('#login-workshop-logo');
+        if (logoEl) logoEl.src = currentWorkshop.logo_url;
+      }
+    }
+
+    // 2. Verificar si hay token de sesión válido
+    const token = getWorkshopToken();
+    if (!token) {
+      showWorkshopLogin();
+      return;
+    }
+
+    const meRes = await api(`/api/workshop/${currentSlug}/auth/me`).catch(() => null);
+    if (!meRes || !meRes.authenticated) {
+      clearWorkshopToken();
+      showWorkshopLogin();
+      return;
+    }
+
+    // Sesión autorizada: mostrar el panel
+    showWorkshopApp();
+
     const dataRes = await api(`/api/workshop/${currentSlug}/data`);
-    currentWorkshop = dataRes.workshop || {};
+    currentWorkshop = dataRes.workshop || currentWorkshop || {};
     currentSettings = dataRes.settings || {};
     workshopData = {
       orders: dataRes.orders || [],
@@ -155,8 +225,11 @@ async function loadWorkshop() {
     renderCurrentSection();
   } catch (err) {
     console.error('Error al cargar taller:', err);
-    toast(`Error al cargar taller: ${err.message}`, true);
-    setText('#home-title', 'Error al conectar con el taller');
+    if (err.message.includes('PIN') || err.message.includes('Sesión') || err.message.includes('autorizado')) {
+      showWorkshopLogin();
+    } else {
+      toast(`Error al cargar taller: ${err.message}`, true);
+    }
   }
 }
 
@@ -912,9 +985,156 @@ function initEvents() {
   });
 }
 
+let pendingAuthEmail = '';
+
+function setupWorkshopAuthListeners() {
+  const formRequestPin = document.querySelector('#form-request-pin');
+  const formVerifyPin = document.querySelector('#form-verify-pin');
+  const btnBackToEmail = document.querySelector('#btn-back-to-email');
+  const btnResendPin = document.querySelector('#btn-resend-pin');
+  const logoutSidebar = document.querySelector('#btn-logout-sidebar');
+  const logoutHeader = document.querySelector('#btn-logout-header');
+
+  if (formRequestPin) {
+    formRequestPin.addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.querySelector('#btn-request-pin');
+      const errEl = document.querySelector('#login-email-error');
+      const emailInput = document.querySelector('#input-login-email');
+      
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Enviando código... ⏳';
+
+      const email = emailInput.value.trim().toLowerCase();
+      try {
+        const res = await fetch(`/api/workshop/${currentSlug}/auth/request-pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'No pudimos enviar el código');
+
+        pendingAuthEmail = email;
+        setText('#login-target-email-display', email);
+        document.querySelector('#login-step-email').style.display = 'none';
+        document.querySelector('#login-step-pin').style.display = 'block';
+
+        const devBanner = document.querySelector('#login-dev-banner');
+        if (data.dev_pin && devBanner) {
+          devBanner.innerHTML = `<strong>Modo de prueba (sin Resend):</strong> Tu código es <strong style="font-size:16px;color:#10b981;">${data.dev_pin}</strong>`;
+          devBanner.style.display = 'block';
+        } else if (devBanner) {
+          devBanner.style.display = 'none';
+        }
+
+        const pinInput = document.querySelector('#input-login-pin');
+        if (pinInput) {
+          pinInput.value = '';
+          pinInput.focus();
+        }
+        toast('¡Código enviado a tu casilla de correo!');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar Código de Acceso ✉';
+      }
+    });
+  }
+
+  if (formVerifyPin) {
+    formVerifyPin.addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.querySelector('#btn-verify-pin');
+      const errEl = document.querySelector('#login-pin-error');
+      const pinInput = document.querySelector('#input-login-pin');
+
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Verificando... ⏳';
+
+      const code = pinInput.value.trim();
+      try {
+        const res = await fetch(`/api/workshop/${currentSlug}/auth/verify-pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: pendingAuthEmail, code })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Código incorrecto');
+
+        setWorkshopToken(data.token);
+        toast(`¡Bienvenido al taller!`);
+        showWorkshopApp();
+        await loadWorkshop();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Ingresar al Taller 🚀';
+      }
+    });
+
+    const pinInput = document.querySelector('#input-login-pin');
+    pinInput?.addEventListener('input', e => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+      if (e.target.value.length === 6) {
+        formVerifyPin.requestSubmit();
+      }
+    });
+  }
+
+  btnBackToEmail?.addEventListener('click', () => {
+    document.querySelector('#login-step-pin').style.display = 'none';
+    document.querySelector('#login-step-email').style.display = 'block';
+  });
+
+  btnResendPin?.addEventListener('click', async () => {
+    if (!pendingAuthEmail) return;
+    toast('Reenviando código...');
+    try {
+      const res = await fetch(`/api/workshop/${currentSlug}/auth/request-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingAuthEmail })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast('¡Nuevo código enviado!');
+        const devBanner = document.querySelector('#login-dev-banner');
+        if (data.dev_pin && devBanner) {
+          devBanner.innerHTML = `<strong>Modo de prueba (sin Resend):</strong> Tu código es <strong style="font-size:16px;color:#10b981;">${data.dev_pin}</strong>`;
+        }
+      } else {
+        toast(data.error || 'Error al reenviar', true);
+      }
+    } catch {
+      toast('Error de conexión', true);
+    }
+  });
+
+  async function handleLogout() {
+    try {
+      await api(`/api/workshop/${currentSlug}/auth/logout`, { method: 'POST' }).catch(() => {});
+    } finally {
+      clearWorkshopToken();
+      showWorkshopLogin();
+      toast('Sesión cerrada.');
+    }
+  }
+
+  logoutSidebar?.addEventListener('click', handleLogout);
+  logoutHeader?.addEventListener('click', handleLogout);
+}
+
 // Iniciar aplicación al cargar el DOM con soporte para carga diferida o asíncrona
 function bootApp() {
   initEvents();
+  setupWorkshopAuthListeners();
   loadWorkshop();
 }
 

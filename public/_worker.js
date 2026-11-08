@@ -59,6 +59,121 @@ async function getAdminFromSession(request, env) {
   return null;
 }
 
+let authSchemaReady = false;
+async function ensureAuthSchema(db) {
+  if (authSchemaReady || !db) return;
+  try {
+    await db.batch([
+      db.prepare(`
+        CREATE TABLE IF NOT EXISTS workshop_login_codes (
+          id TEXT PRIMARY KEY,
+          workshop_id TEXT NOT NULL,
+          email TEXT NOT NULL,
+          code TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          used INTEGER DEFAULT 0,
+          created_at TEXT NOT NULL
+        )
+      `),
+      db.prepare(`
+        CREATE TABLE IF NOT EXISTS workshop_sessions (
+          id TEXT PRIMARY KEY,
+          workshop_id TEXT NOT NULL,
+          email TEXT NOT NULL,
+          role TEXT NOT NULL,
+          token TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `)
+    ]);
+    authSchemaReady = true;
+  } catch (err) {
+    console.warn('ensureAuthSchema note:', err.message);
+  }
+}
+
+async function sendResendPinEmail(toEmail, pinCode, workshopName, env) {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log(`[AUTH PIN] Resend API key pendiente en env. Código para ${toEmail} (${workshopName}): ${pinCode}`);
+    return { success: true, simulated: true };
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: env.EMAIL_FROM || 'Tu Taller Soft <acceso@tutallersoft.com>',
+        to: [toEmail],
+        subject: `${pinCode} es tu código de acceso · ${workshopName}`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1110; color: #f1f5f9; padding: 40px 20px; text-align: center;">
+            <div style="max-width: 480px; margin: 0 auto; background-color: #101613; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 16px; padding: 36px 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+              <div style="display: inline-block; padding: 6px 14px; background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 9999px; font-size: 12px; font-weight: 700; color: #10b981; letter-spacing: 1px; margin-bottom: 20px;">
+                CÓDIGO DE SEGURIDAD
+              </div>
+              <h2 style="color: #ffffff; font-size: 24px; margin: 0 0 8px 0; font-weight: 800;">${workshopName}</h2>
+              <p style="color: #94a3b8; font-size: 14px; margin: 0 0 28px 0; line-height: 1.5;">
+                Ingresá este código de 6 dígitos en tu pantalla para acceder al panel del taller:
+              </p>
+              
+              <div style="background: #131e18; border: 2px solid #10b981; border-radius: 12px; padding: 18px 24px; margin-bottom: 28px; font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #10b981; font-family: monospace;">
+                ${pinCode}
+              </div>
+              
+              <p style="color: #64748b; font-size: 12px; margin: 0; line-height: 1.5;">
+                Este código expira en 15 minutos por seguridad.<br>
+                Si no solicitaste este acceso, podés ignorar este mensaje con total tranquilidad.
+              </p>
+            </div>
+            <p style="margin-top: 24px; font-size: 11px; color: #475569;">
+              Tu Taller Soft · Sistema de Gestión y Trazabilidad Técnica
+            </p>
+          </div>
+        `
+      })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error('Error enviando con Resend:', data);
+      return { success: false, error: data.message || 'Error en Resend' };
+    }
+    return { success: true, id: data.id };
+  } catch (err) {
+    console.error('Excepción al conectar con Resend:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+async function getWorkshopSession(request, env, workshopId) {
+  const authHeader = request.headers.get('Authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7).trim();
+  if (!token) return null;
+
+  const nowIso = new Date().toISOString();
+  // Permitir token de Super-Admin si aplica
+  const superAdmin = await env.DB.prepare(`
+    SELECT email, name FROM super_admins WHERE session_token = ? AND (session_expires_at IS NULL OR session_expires_at > ?)
+  `).bind(token, nowIso).first();
+  if (superAdmin) {
+    return { email: superAdmin.email, name: superAdmin.name, role: 'super_admin' };
+  }
+
+  // Sesión del taller
+  const session = await env.DB.prepare(`
+    SELECT email, role FROM workshop_sessions 
+    WHERE workshop_id = ? AND token = ? AND expires_at > ?
+  `).bind(workshopId, token, nowIso).first();
+  return session;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -435,18 +550,134 @@ export default {
       const daysRemaining = Math.max(0, Math.ceil((expiresMs - now) / 86400000));
       const isExpired = expiresMs <= now;
 
-      // 1. Info básica
+      await ensureAuthSchema(db);
+
+      // 1. Info básica pública (nombre, logo y estado para la pantalla de login/panel)
       if (subRoute === 'info' && request.method === 'GET') {
+        const settings = await db.prepare('SELECT logo_url FROM workshop_settings WHERE workshop_id = ?').bind(workshop.id).first();
         return json({
           workshop: {
-            ...workshop,
+            id: workshop.id,
+            name: workshop.name,
+            slug: workshop.slug,
+            country: workshop.country,
+            currency: workshop.currency,
+            payment_methods: workshop.payment_methods,
+            logo_url: settings?.logo_url || null,
             days_remaining: daysRemaining,
             is_expired: isExpired
           }
         });
       }
 
-      // 2. Datos completos para el panel
+      // 2. Auth: Solicitar PIN de acceso
+      if (subRoute === 'auth/request-pin' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const email = (body.email || '').trim().toLowerCase();
+
+        if (!email || !email.includes('@')) {
+          return json({ error: 'Ingresá un correo electrónico válido.' }, 400);
+        }
+
+        // Verificar si el correo pertenece al taller o es el Super-Admin
+        const isOwner = workshop.owner_email && workshop.owner_email.toLowerCase() === email;
+        const isSuperAdmin = email === SUPER_ADMIN_DEFAULT.toLowerCase();
+        let registeredUser = null;
+
+        if (!isOwner && !isSuperAdmin) {
+          registeredUser = await db.prepare('SELECT id, name, role FROM workshop_users WHERE workshop_id = ? AND LOWER(email) = ?')
+            .bind(workshop.id, email).first();
+        }
+
+        if (!isOwner && !isSuperAdmin && !registeredUser) {
+          return json({ error: 'Este correo no está registrado en este taller. Consultá con el administrador.' }, 403);
+        }
+
+        // Generar PIN de 6 dígitos
+        const pinCode = String(Math.floor(100000 + Math.random() * 900000));
+        const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+        const codeId = crypto.randomUUID();
+        const nowIso = new Date().toISOString();
+
+        await db.prepare(`
+          INSERT INTO workshop_login_codes (id, workshop_id, email, code, expires_at, used, created_at)
+          VALUES (?, ?, ?, ?, ?, 0, ?)
+        `).bind(codeId, workshop.id, email, pinCode, expiresAt, nowIso).run();
+
+        await sendResendPinEmail(email, pinCode, workshop.name, env);
+
+        return json({
+          success: true,
+          message: 'Código de acceso enviado a tu correo.',
+          ...(env.RESEND_API_KEY ? {} : { dev_pin: pinCode })
+        });
+      }
+
+      // 3. Auth: Validar PIN de acceso
+      if (subRoute === 'auth/verify-pin' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const email = (body.email || '').trim().toLowerCase();
+        const code = String(body.code || '').replace(/\D/g, '');
+
+        if (!email || !code || code.length !== 6) {
+          return json({ error: 'Ingresá el código de 6 dígitos completo.' }, 400);
+        }
+
+        const nowIso = new Date().toISOString();
+        const validCode = await db.prepare(`
+          SELECT id FROM workshop_login_codes 
+          WHERE workshop_id = ? AND email = ? AND code = ? AND used = 0 AND expires_at > ?
+          ORDER BY created_at DESC
+        `).bind(workshop.id, email, code, nowIso).first();
+
+        if (!validCode) {
+          return json({ error: 'Código inválido o expirado. Solicitá uno nuevo.' }, 400);
+        }
+
+        // Marcar como usado
+        await db.prepare('UPDATE workshop_login_codes SET used = 1 WHERE id = ?').bind(validCode.id).run();
+
+        // Crear sesión de 30 días
+        const sessionToken = crypto.randomUUID() + '-' + crypto.randomUUID();
+        const sessionExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
+        const sessionId = crypto.randomUUID();
+
+        await db.prepare(`
+          INSERT INTO workshop_sessions (id, workshop_id, email, role, token, expires_at, created_at)
+          VALUES (?, ?, ?, 'technician', ?, ?, ?)
+        `).bind(sessionId, workshop.id, email, sessionToken, sessionExpiresAt, nowIso).run();
+
+        return json({
+          success: true,
+          token: sessionToken,
+          user: { email, workshop_name: workshop.name }
+        });
+      }
+
+      // 4. Auth: Estado de sesión del usuario
+      if (subRoute === 'auth/me' && request.method === 'GET') {
+        const session = await getWorkshopSession(request, env, workshop.id);
+        if (!session) return json({ authenticated: false }, 401);
+        return json({ authenticated: true, user: session });
+      }
+
+      // 5. Auth: Cerrar Sesión
+      if (subRoute === 'auth/logout' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization') || '';
+        const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+        if (token) {
+          await db.prepare('DELETE FROM workshop_sessions WHERE workshop_id = ? AND token = ?').bind(workshop.id, token).run();
+        }
+        return json({ success: true });
+      }
+
+      // Verificación de autenticación para todas las siguientes acciones del taller
+      const sessionUser = await getWorkshopSession(request, env, workshop.id);
+      if (!sessionUser) {
+        return json({ error: 'Acceso no autorizado al taller. Por favor ingresá con tu PIN.' }, 401);
+      }
+
+      // 6. Datos completos para el panel
       if (subRoute === 'data' && request.method === 'GET') {
         const [settings, clientsRes, ordersRes, stockRes, cashRes] = await Promise.all([
           db.prepare('SELECT * FROM workshop_settings WHERE workshop_id = ?').bind(workshop.id).first(),

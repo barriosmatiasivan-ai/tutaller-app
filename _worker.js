@@ -214,6 +214,7 @@ export default {
       // Endpoint de Login (Público)
       if (url.pathname === '/api/admin/auth/login' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));
+        const email = (body.email || '').trim().toLowerCase();
         const rawPassword = body.password || '';
         const password = rawPassword.trim();
 

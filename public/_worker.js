@@ -63,30 +63,28 @@ let authSchemaReady = false;
 async function ensureAuthSchema(db) {
   if (authSchemaReady || !db) return;
   try {
-    await db.batch([
-      db.prepare(`
-        CREATE TABLE IF NOT EXISTS workshop_login_codes (
-          id TEXT PRIMARY KEY,
-          workshop_id TEXT NOT NULL,
-          email TEXT NOT NULL,
-          code TEXT NOT NULL,
-          expires_at TEXT NOT NULL,
-          used INTEGER DEFAULT 0,
-          created_at TEXT NOT NULL
-        )
-      `),
-      db.prepare(`
-        CREATE TABLE IF NOT EXISTS workshop_sessions (
-          id TEXT PRIMARY KEY,
-          workshop_id TEXT NOT NULL,
-          email TEXT NOT NULL,
-          role TEXT NOT NULL,
-          token TEXT NOT NULL,
-          expires_at TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        )
-      `)
-    ]);
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS workshop_login_codes (
+        id TEXT PRIMARY KEY,
+        workshop_id TEXT NOT NULL,
+        email TEXT NOT NULL,
+        code TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    `).run();
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS workshop_sessions (
+        id TEXT PRIMARY KEY,
+        workshop_id TEXT NOT NULL,
+        email TEXT NOT NULL,
+        role TEXT NOT NULL,
+        token TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    `).run();
     authSchemaReady = true;
   } catch (err) {
     console.warn('ensureAuthSchema note:', err.message);
@@ -554,7 +552,14 @@ export default {
 
       // 1. Info básica pública (nombre, logo y estado para la pantalla de login/panel)
       if (subRoute === 'info' && request.method === 'GET') {
-        const settings = await db.prepare('SELECT logo_url FROM workshop_settings WHERE workshop_id = ?').bind(workshop.id).first();
+        let logoUrl = null;
+        try {
+          const settings = await db.prepare('SELECT * FROM workshop_settings WHERE workshop_id = ?').bind(workshop.id).first();
+          logoUrl = settings?.logo_url || null;
+        } catch (e) {
+          console.warn('Settings read note:', e.message);
+        }
+
         return json({
           workshop: {
             id: workshop.id,
@@ -563,7 +568,7 @@ export default {
             country: workshop.country,
             currency: workshop.currency,
             payment_methods: workshop.payment_methods,
-            logo_url: settings?.logo_url || null,
+            logo_url: logoUrl,
             days_remaining: daysRemaining,
             is_expired: isExpired
           }

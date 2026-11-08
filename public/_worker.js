@@ -527,7 +527,9 @@ export default {
 
     // Ruta de seguimiento público: /seguimiento/:token
     if (url.pathname.startsWith('/seguimiento/')) {
-      const trackingReq = new Request(new URL('/seguimiento/index.html', request.url), request);
+      const parts = url.pathname.split('/');
+      const token = parts[2] || '';
+      const trackingReq = new Request(new URL('/seguimiento/?token=' + encodeURIComponent(token), request.url), request);
       return env.ASSETS.fetch(trackingReq);
     }
 
@@ -546,7 +548,7 @@ export default {
           return new Response(`<!DOCTYPE html><html><body style="background:#0b1110;color:#fff;font-family:sans-serif;text-align:center;padding:60px 20px;"><div style="max-width:440px;margin:auto;background:#141f1c;padding:32px;border-radius:12px;border:1px solid #ef4444;"><h2 style="color:#ef4444;margin-bottom:8px;">Taller Suspendido</h2><p style="color:#9fb5a8;line-height:1.5;">El acceso al taller <strong>${w.name}</strong> está pausado por vencimiento de suscripción.</p><p style="margin-top:18px;"><a href="https://wa.me/5491123456789?text=Hola!%20Quiero%20renovar%20la%20suscripci%C3%B3n%20de%20mi%20taller%20${w.name}" style="background:#10b981;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;">📲 Contactar para Reactivar</a></p></div></body></html>`, { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         }
       }
-      const tallerReq = new Request(new URL('/taller/index.html', request.url), request);
+      const tallerReq = new Request(new URL('/taller/?slug=' + encodeURIComponent(slug), request.url), request);
       return env.ASSETS.fetch(tallerReq);
     }
 

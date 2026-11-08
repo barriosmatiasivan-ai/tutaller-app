@@ -238,7 +238,7 @@ function updateBrandUI() {
   const name = currentWorkshop.name || 'Mi Taller';
   document.title = `${name} · Tu Taller`;
   const isLifetime = currentWorkshop.plan === 'lifetime' || currentWorkshop.is_lifetime || (Date.parse(currentWorkshop.expires_at || '') > Date.parse('2090-01-01'));
-  const planName = isLifetime ? 'Plan Vitalicio 👑' : currentWorkshop.plan === 'pro' ? 'Plan Pro ⭐' : 'Plan Básico';
+  const planName = isLifetime ? 'Plan Pro Vitalicio 👑' : currentWorkshop.plan === 'pro' ? 'Plan Pro ⭐' : 'Plan Básico';
   const remainingText = isLifetime ? 'Acceso Permanente' : `${currentWorkshop.days_remaining || 0} días restantes`;
   setText('#sidebar-plan-label', `${planName} · ${remainingText}`);
 

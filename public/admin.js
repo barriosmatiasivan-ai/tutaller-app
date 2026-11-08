@@ -184,8 +184,8 @@ function renderWorkshops() {
     }
 
     // Badge de plan
-    const planBadge = w.plan === 'lifetime'
-      ? '<span class="badge lifetime">👑 Plan Vitalicio</span>'
+    const planBadge = isLifetime
+      ? '<span class="badge lifetime" title="Acceso Permanente sin vencimiento">👑 Pro Vitalicio</span>'
       : w.plan === 'pro' 
         ? '<span class="badge pro">⭐ Plan Pro</span>' 
         : '<span class="badge basic">Plan Básico</span>';
@@ -265,7 +265,7 @@ function renderWorkshops() {
             <button class="secondary" onclick="toggleStatus('${w.id}', '${w.status}')" title="${w.status === 'active' ? 'Suspender taller' : 'Reactivar taller'}">
               ${w.status === 'active' ? '⏸️' : '▶️'}
             </button>
-            <button class="secondary" onclick="openPlanModal('${w.id}', '${esc(w.name)}', '${w.plan}')" title="Modificar plan de suscripción">
+            <button class="secondary" onclick="openPlanModal('${w.id}', '${esc(w.name)}', '${w.plan}', ${isLifetime})" title="Modificar plan y vigencia">
               🏷️ Plan
             </button>
             <button class="secondary" onclick="deleteWorkshop('${w.id}', '${esc(w.name)}')" title="Eliminar taller" style="color:#ef4444;">🗑️</button>
@@ -294,16 +294,17 @@ window.toggleStatus = async function(id, currentStatus) {
   }
 };
 
-window.openPlanModal = function(id, name, currentPlan) {
+window.openPlanModal = function(id, name, currentPlan, isLifetime) {
   document.querySelector('#plan-target-id').value = id;
-  const planNames = { lifetime: '👑 Vitalicio (Acceso Permanente)', pro: '⭐ Pro', basic: '🥉 Básico' };
-  document.querySelector('#plan-target-name').textContent = `${name} · Plan actual: ${planNames[currentPlan] || currentPlan}`;
-  document.querySelector('#plan-select').value = currentPlan || 'basic';
+  const currentLabel = isLifetime ? '👑 Pro Vitalicio (Permanente)' : currentPlan === 'pro' ? '⭐ Pro' : '🥉 Básico';
+  document.querySelector('#plan-target-name').textContent = `${name} · Actual: ${currentLabel}`;
+  document.querySelector('#plan-select').value = isLifetime ? 'lifetime' : (currentPlan || 'pro');
+  document.querySelector('#plan-duration').value = isLifetime ? 'lifetime' : 'keep';
   document.querySelector('#plan-modal').showModal();
 };
 
 window.togglePlan = function(id, currentPlan) {
-  window.openPlanModal(id, '', currentPlan);
+  window.openPlanModal(id, '', currentPlan, currentPlan === 'lifetime');
 };
 
 window.openRenewModal = function(id, name) {
@@ -443,6 +444,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('#close-plan-modal')?.addEventListener('click', () => planModal.close());
     document.querySelector('#cancel-plan-btn')?.addEventListener('click', () => planModal.close());
 
+    document.querySelector('#plan-select')?.addEventListener('change', e => {
+      const dur = document.querySelector('#plan-duration');
+      if (!dur) return;
+      if (e.target.value === 'lifetime') {
+        dur.value = 'lifetime';
+      }
+    });
+
     document.querySelector('#plan-form')?.addEventListener('submit', async e => {
       e.preventDefault();
       const submitBtn = e.submitter;
@@ -450,14 +459,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const id = document.querySelector('#plan-target-id').value;
       const plan = document.querySelector('#plan-select').value;
-      const planNames = { lifetime: '👑 Vitalicio (Acceso Permanente)', pro: '⭐ Pro', basic: '🥉 Básico' };
+      const duration = document.querySelector('#plan-duration').value;
+      const planNames = { lifetime: '👑 Pro Vitalicio (Permanente)', pro: '⭐ Pro', basic: '🥉 Básico' };
 
       try {
         await api(`/api/admin/workshops/${id}/plan`, {
           method: 'POST',
-          body: JSON.stringify({ plan })
+          body: JSON.stringify({ plan, duration })
         });
-        toast(`¡Plan actualizado a ${planNames[plan] || plan} con éxito!`);
+        toast(`¡Plan y vigencia actualizados a ${planNames[plan] || plan} con éxito!`);
         planModal.close();
         await loadData();
       } catch (err) {

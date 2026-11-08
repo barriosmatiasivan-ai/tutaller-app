@@ -480,28 +480,38 @@ export default {
         return json({ success: true, expires_at: newExpiresAt });
       }
 
-      // 6. Cambiar plan (basic / pro / lifetime)
+      // 6. Cambiar plan (basic / pro / lifetime) y vigencia
       if (url.pathname.match(/^\/api\/admin\/workshops\/[^/]+\/plan$/) && request.method === 'POST') {
         const id = url.pathname.split('/')[4];
         const body = await request.json().catch(() => ({}));
-        const newPlan = ['basic', 'pro', 'lifetime'].includes(body.plan) ? body.plan : 'basic';
-        if (newPlan === 'lifetime') {
-          const newExpiresAt = '2099-12-31T23:59:59.000Z';
-          await db.prepare('UPDATE workshops SET plan = ?, expires_at = ?, status = ?, updated_at = ? WHERE id = ?')
-            .bind(newPlan, newExpiresAt, 'active', new Date().toISOString(), id).run();
-        } else {
-          const current = await db.prepare('SELECT expires_at FROM workshops WHERE id = ?').bind(id).first();
-          const curExp = current?.expires_at ? Date.parse(current.expires_at) : 0;
-          if (curExp > Date.parse('2090-01-01')) {
-            const next30Days = new Date(Date.now() + 30 * 86400000).toISOString();
-            await db.prepare('UPDATE workshops SET plan = ?, expires_at = ?, updated_at = ? WHERE id = ?')
-              .bind(newPlan, next30Days, new Date().toISOString(), id).run();
-          } else {
-            await db.prepare('UPDATE workshops SET plan = ?, updated_at = ? WHERE id = ?')
-              .bind(newPlan, new Date().toISOString(), id).run();
+        const newPlan = ['basic', 'pro', 'lifetime'].includes(body.plan) ? body.plan : 'pro';
+        const duration = body.duration || 'keep';
+
+        const current = await db.prepare('SELECT plan, expires_at, status FROM workshops WHERE id = ?').bind(id).first();
+        if (!current) return json({ error: 'Taller no encontrado' }, 404);
+
+        const currentMs = Date.parse(current.expires_at) || 0;
+        const isCurrentLifetime = current.plan === 'lifetime' || currentMs > Date.parse('2090-01-01');
+
+        let newExpiresAt = current.expires_at;
+
+        if (newPlan === 'lifetime' || duration === 'lifetime') {
+          newExpiresAt = '2099-12-31T23:59:59.000Z';
+        } else if (duration !== 'keep') {
+          const days = parseInt(duration, 10);
+          if (days > 0) {
+            newExpiresAt = new Date(Date.now() + days * 86400000).toISOString();
           }
+        } else if (!isCurrentLifetime && currentMs <= Date.now()) {
+          // Si estaba vencido y no se especificó duración, darle 30 días
+          newExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
         }
-        return json({ success: true, plan: newPlan });
+        // Si newPlan es 'pro' o 'basic' y duration es 'keep' y ya era permanente, newExpiresAt se CONSERVA en 2099
+
+        await db.prepare('UPDATE workshops SET plan = ?, expires_at = ?, status = ?, updated_at = ? WHERE id = ?')
+          .bind(newPlan, newExpiresAt, 'active', new Date().toISOString(), id).run();
+
+        return json({ success: true, plan: newPlan, expires_at: newExpiresAt });
       }
 
       // 7. Eliminar taller
@@ -927,8 +937,19 @@ export default {
       return env.ASSETS.fetch(tallerReq);
     }
 
-    // Servir archivos estáticos del frontend
-    return env.ASSETS.fetch(request);
+    // Servir archivos estáticos del frontend (sin cache para el panel admin)
+    const assetRes = await env.ASSETS.fetch(request);
+    if (url.pathname.startsWith('/admin') || url.pathname === '/admin.js') {
+      const resHeaders = new Headers(assetRes.headers);
+      resHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      resHeaders.set('Pragma', 'no-cache');
+      return new Response(assetRes.body, {
+        status: assetRes.status,
+        statusText: assetRes.statusText,
+        headers: resHeaders
+      });
+    }
+    return assetRes;
   },
 
   // Disparador programado (Cron Job mensual)

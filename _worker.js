@@ -259,9 +259,10 @@ export default {
       }
     }
 
-    // Redirección conveniente: /admin -> /admin.html
+    // Servir /admin.html cuando se accede a /admin
     if (url.pathname === '/admin') {
-      return Response.redirect(new URL('/admin.html' + url.search, request.url), 302);
+      const adminReq = new Request(new URL('/admin.html', request.url), request);
+      return env.ASSETS.fetch(adminReq);
     }
 
     // Servir archivos estáticos del frontend

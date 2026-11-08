@@ -343,9 +343,10 @@ export default {
 
         const enriched = await Promise.all(workshops.map(async w => {
           const expiresMs = Date.parse(w.expires_at) || 0;
+          const isLifetime = w.plan === 'lifetime' || (expiresMs && expiresMs > Date.parse('2090-01-01'));
           const remainingMs = expiresMs - now;
-          const daysRemaining = Math.ceil(remainingMs / (86400000));
-          const isExpired = remainingMs <= 0;
+          const daysRemaining = isLifetime ? 99999 : Math.ceil(remainingMs / (86400000));
+          const isExpired = isLifetime ? false : remainingMs <= 0;
 
           const [thisWeekRes, lastWeekRes] = await Promise.all([
             db.prepare('SELECT COUNT(*) as count FROM repair_orders WHERE workshop_id = ? AND created_at >= ?').bind(w.id, sevenDaysAgo).first(),
@@ -366,6 +367,7 @@ export default {
 
           return {
             ...w,
+            is_lifetime: isLifetime,
             days_remaining: daysRemaining,
             is_expired: isExpired,
             orders_this_week: ordersThisWeek,
@@ -386,8 +388,9 @@ export default {
         const ownerEmail = (body.owner_email || '').trim().toLowerCase();
         const phone = (body.phone || '').trim();
         const address = (body.address || '').trim();
-        const plan = body.plan === 'pro' ? 'pro' : 'basic';
+        const plan = ['basic', 'pro', 'lifetime'].includes(body.plan) ? body.plan : 'basic';
         const durationDays = parseInt(body.duration_days, 10) || 30;
+        const isLifetime = plan === 'lifetime' || durationDays >= 36500;
         const notes = (body.notes || '').trim();
 
         if (!name || name.length < 2) return json({ error: 'El nombre del taller es obligatorio (mínimo 2 caracteres).' }, 400);
@@ -416,7 +419,7 @@ export default {
         const id = crypto.randomUUID();
         const now = new Date();
         const nowIso = now.toISOString();
-        const expiresAt = new Date(now.getTime() + durationDays * 86400000).toISOString();
+        const expiresAt = isLifetime ? '2099-12-31T23:59:59.000Z' : new Date(now.getTime() + durationDays * 86400000).toISOString();
 
         await db.batch([
           db.prepare(`
@@ -457,6 +460,13 @@ export default {
         const body = await request.json().catch(() => ({}));
         const addDays = parseInt(body.days, 10) || 30;
 
+        if (addDays >= 36500) {
+          const newExpiresAt = '2099-12-31T23:59:59.000Z';
+          await db.prepare('UPDATE workshops SET expires_at = ?, plan = "lifetime", status = "active", updated_at = ? WHERE id = ?')
+            .bind(newExpiresAt, new Date().toISOString(), id).run();
+          return json({ success: true, expires_at: newExpiresAt, plan: 'lifetime' });
+        }
+
         const current = await db.prepare('SELECT expires_at FROM workshops WHERE id = ?').bind(id).first();
         if (!current) return json({ error: 'Taller no encontrado' }, 404);
 
@@ -470,13 +480,19 @@ export default {
         return json({ success: true, expires_at: newExpiresAt });
       }
 
-      // 6. Cambiar plan (basic / pro)
+      // 6. Cambiar plan (basic / pro / lifetime)
       if (url.pathname.match(/^\/api\/admin\/workshops\/[^/]+\/plan$/) && request.method === 'POST') {
         const id = url.pathname.split('/')[4];
         const body = await request.json().catch(() => ({}));
-        const newPlan = body.plan === 'pro' ? 'pro' : 'basic';
-        await db.prepare('UPDATE workshops SET plan = ?, updated_at = ? WHERE id = ?')
-          .bind(newPlan, new Date().toISOString(), id).run();
+        const newPlan = ['basic', 'pro', 'lifetime'].includes(body.plan) ? body.plan : 'basic';
+        if (newPlan === 'lifetime') {
+          const newExpiresAt = '2099-12-31T23:59:59.000Z';
+          await db.prepare('UPDATE workshops SET plan = ?, expires_at = ?, status = "active", updated_at = ? WHERE id = ?')
+            .bind(newPlan, newExpiresAt, new Date().toISOString(), id).run();
+        } else {
+          await db.prepare('UPDATE workshops SET plan = ?, updated_at = ? WHERE id = ?')
+            .bind(newPlan, new Date().toISOString(), id).run();
+        }
         return json({ success: true, plan: newPlan });
       }
 

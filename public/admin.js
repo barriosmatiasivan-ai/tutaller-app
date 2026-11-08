@@ -170,8 +170,11 @@ function renderWorkshops() {
   tbody.innerHTML = filtered.map(w => {
     // Badge de estado
     let statusBadge = '';
+    const isLifetime = w.plan === 'lifetime' || w.is_lifetime;
     if (w.status === 'suspended') {
       statusBadge = '<span class="badge suspended">⏸️ Suspendido</span>';
+    } else if (isLifetime) {
+      statusBadge = '<span class="badge active" style="background:rgba(16, 185, 129, 0.2);color:#10b981;border:1px solid rgba(16, 185, 129, 0.35);">✓ Vitalicio Activo</span>';
     } else if (w.is_expired) {
       statusBadge = '<span class="badge suspended">⌛ Vencido</span>';
     } else if (w.days_remaining <= 7) {
@@ -181,9 +184,11 @@ function renderWorkshops() {
     }
 
     // Badge de plan
-    const planBadge = w.plan === 'pro' 
-      ? '<span class="badge pro">⭐ Plan Pro</span>' 
-      : '<span class="badge basic">Plan Básico</span>';
+    const planBadge = w.plan === 'lifetime'
+      ? '<span class="badge lifetime">👑 Plan Vitalicio</span>'
+      : w.plan === 'pro' 
+        ? '<span class="badge pro">⭐ Plan Pro</span>' 
+        : '<span class="badge basic">Plan Básico</span>';
 
     // Actividad semanal
     let activityHtml = '';
@@ -207,18 +212,22 @@ function renderWorkshops() {
     let welcomeButton = '';
     if (w.phone) {
       const cleanPhone = w.phone.replace(/[^0-9]/g, '');
-      const waText = w.days_remaining <= 7
-        ? `Hola ${w.name}! Te escribo de Tu Taller Soft para avisarte que tu suscripción vence en ${w.days_remaining} días. ¿Querés renovar para continuar sin interrupciones?`
-        : `Hola ${w.name}! Te escribo del equipo de soporte de Tu Taller Soft para ver cómo viene funcionando el sistema en tu taller.`;
+      const waText = isLifetime
+        ? `Hola ${w.name}! Te escribo del equipo de soporte de Tu Taller Soft para ver cómo viene funcionando el sistema en tu taller.`
+        : w.days_remaining <= 7
+          ? `Hola ${w.name}! Te escribo de Tu Taller Soft para avisarte que tu suscripción vence en ${w.days_remaining} días. ¿Querés renovar para continuar sin interrupciones?`
+          : `Hola ${w.name}! Te escribo del equipo de soporte de Tu Taller Soft para ver cómo viene funcionando el sistema en tu taller.`;
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`;
       waButton = `<a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="secondary" title="Enviar WhatsApp al dueño" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;">💬</a>`;
 
-      const welcomeText = `¡Hola ${w.name}! Te damos la bienvenida a Tu Taller Soft 🚀. Tu taller ya está habilitado con Plan ${w.plan === 'pro' ? 'Pro' : 'Básico'}. Podés ingresar desde tu celular o PC en: https://app.tutallersoft.com/t/${w.slug} ¡Guardalo en la pantalla de inicio como una app!`;
+      const planLabel = w.plan === 'lifetime' ? 'Vitalicio 👑 (Acceso Permanente)' : w.plan === 'pro' ? 'Pro ⭐' : 'Básico';
+      const welcomeText = `¡Hola ${w.name}! Te damos la bienvenida a Tu Taller Soft 🚀. Tu taller ya está habilitado con Plan ${planLabel}. Podés ingresar desde tu celular o PC en: https://app.tutallersoft.com/t/${w.slug} ¡Guardalo en la pantalla de inicio como una app!`;
       const welcomeUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(welcomeText)}`;
       welcomeButton = `<a href="${welcomeUrl}" target="_blank" rel="noopener noreferrer" class="secondary" title="Enviar Bienvenida con enlace por WhatsApp" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;background:rgba(37, 211, 102, 0.15);color:#25d366;border-color:rgba(37, 211, 102, 0.3);">📲</a>`;
     }
 
     const openLink = `<a href="/t/${w.slug}" target="_blank" class="secondary" title="Abrir Taller del Técnico" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;">🔗</a>`;
+    const nextPlanLabel = w.plan === 'basic' ? '⭐ Pro' : w.plan === 'pro' ? '👑 Vitalicio' : 'Básico';
 
     return `
       <tr>
@@ -236,10 +245,13 @@ function renderWorkshops() {
         <td>${planBadge}</td>
         <td>${statusBadge}</td>
         <td>
-          <div>${formatDate(w.expires_at)}</div>
-          <div style="font-size:11px;color:${w.days_remaining <= 7 ? 'var(--warning)' : 'var(--text-muted)'};">
-            ${w.is_expired ? 'Vencido' : `${w.days_remaining} días restantes`}
-          </div>
+          ${isLifetime
+            ? '<div style="font-weight:700;color:#ffffff;">Permanente</div><div style="font-size:11px;color:#10b981;font-weight:600;">✓ Sin vencimiento</div>'
+            : `<div>${formatDate(w.expires_at)}</div>
+               <div style="font-size:11px;color:${w.days_remaining <= 7 ? 'var(--warning)' : 'var(--text-muted)'};">
+                 ${w.is_expired ? 'Vencido' : `${w.days_remaining} días restantes`}
+               </div>`
+          }
         </td>
         <td>
           ${activityHtml}
@@ -254,8 +266,8 @@ function renderWorkshops() {
             <button class="secondary" onclick="toggleStatus('${w.id}', '${w.status}')" title="${w.status === 'active' ? 'Suspender taller' : 'Reactivar taller'}">
               ${w.status === 'active' ? '⏸️' : '▶️'}
             </button>
-            <button class="secondary" onclick="togglePlan('${w.id}', '${w.plan}')" title="Cambiar a ${w.plan === 'pro' ? 'Básico' : 'Pro'}">
-              🔄 ${w.plan === 'pro' ? 'Básico' : 'Pro'}
+            <button class="secondary" onclick="togglePlan('${w.id}', '${w.plan}')" title="Cambiar a ${nextPlanLabel}">
+              🔄 ${nextPlanLabel}
             </button>
             <button class="secondary" onclick="deleteWorkshop('${w.id}', '${esc(w.name)}')" title="Eliminar taller" style="color:#ef4444;">🗑️</button>
           </div>
@@ -284,13 +296,15 @@ window.toggleStatus = async function(id, currentStatus) {
 };
 
 window.togglePlan = async function(id, currentPlan) {
-  const newPlan = currentPlan === 'pro' ? 'basic' : 'pro';
+  const planCycle = { basic: 'pro', pro: 'lifetime', lifetime: 'basic' };
+  const newPlan = planCycle[currentPlan] || 'basic';
+  const label = newPlan === 'lifetime' ? 'VITALICIO 👑' : newPlan === 'pro' ? 'PRO ⭐' : 'BÁSICO';
   try {
     await api(`/api/admin/workshops/${id}/plan`, {
       method: 'POST',
       body: JSON.stringify({ plan: newPlan })
     });
-    toast(`Plan actualizado a ${newPlan.toUpperCase()}.`);
+    toast(`Plan actualizado a ${label}.`);
     await loadData();
   } catch (err) {
     toast(err.message, true);
@@ -349,6 +363,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.querySelector('#close-create-modal').addEventListener('click', () => createModal.close());
   document.querySelector('#cancel-create-btn').addEventListener('click', () => createModal.close());
+
+  // Auto-seleccionar vigencia permanente si eligen Plan Vitalicio
+  document.querySelector('#new-plan')?.addEventListener('change', e => {
+    const durationSelect = document.querySelector('#new-duration');
+    if (!durationSelect) return;
+    if (e.target.value === 'lifetime') {
+      durationSelect.value = '36500';
+    } else if (durationSelect.value === '36500') {
+      durationSelect.value = '30';
+    }
+  });
 
   // Slug automático al tipear nombre
   document.querySelector('#new-name').addEventListener('input', e => {

@@ -513,16 +513,24 @@ export default {
       if (subRoute === 'cash' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));
         const amountCents = Math.round(Number(body.amount || 0) * 100);
-        const kind = body.type === 'out' ? 'out' : 'in';
+        const kind = body.type === 'out' || body.type === 'expense' ? 'expense' : 'income';
         const method = body.payment_method || 'efectivo';
         const notes = body.concept || 'Movimiento de caja';
         const nowIso = new Date().toISOString();
         const entryId = crypto.randomUUID();
+        const accountId = `acc-${workshop.id}`;
 
-        await db.prepare(`
-          INSERT INTO cash_entries (id, workshop_id, amount_cents, kind, payment_method, notes, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).bind(entryId, workshop.id, amountCents, kind, method, notes, nowIso).run();
+        await db.batch([
+          db.prepare(`
+            INSERT OR IGNORE INTO finance_accounts (id, workshop_id, direction, total_cents, cost_cents, created_at)
+            VALUES (?, ?, 'receivable', ?, 0, ?)
+          `).bind(accountId, workshop.id, amountCents, nowIso),
+
+          db.prepare(`
+            INSERT INTO cash_entries (id, workshop_id, account_id, amount_cents, kind, payment_method, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(entryId, workshop.id, accountId, amountCents, kind, method, notes, nowIso)
+        ]);
 
         return json({ success: true, id: entryId }, 201);
       }

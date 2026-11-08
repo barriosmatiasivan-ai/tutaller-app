@@ -255,7 +255,7 @@ function renderCash() {
         <td>${e.created_at ? new Date(e.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
         <td>${esc(e.concept)}</td>
         <td>${methodBadge}</td>
-        <td><span style="color:${e.type === 'in' ? 'var(--accent)' : '#ef4444'};font-weight:700;">${e.type === 'in' ? 'Ingreso' : 'Egreso'}</span></td>
+        <td><span style="color:${(e.type === 'income' || e.type === 'in') ? 'var(--accent)' : '#ef4444'};font-weight:700;">${(e.type === 'income' || e.type === 'in') ? 'Ingreso' : 'Egreso'}</span></td>
         <td><strong>${formatMoney(e.amount, currentWorkshop.currency)}</strong></td>
       </tr>
     `;

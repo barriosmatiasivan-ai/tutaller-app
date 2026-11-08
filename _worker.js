@@ -15,18 +15,47 @@ function json(data, status = 200) {
   });
 }
 
-function getAdminEmail(request, env) {
+const PWD_SALT = 'tutaller-salt-2026';
+
+async function hashPassword(password) {
+  const enc = new TextEncoder();
+  const data = enc.encode(PWD_SALT + ':' + password);
+  const hashBuf = await crypto.subtle.digest('SHA-256', data);
+  const hashArr = Array.from(new Uint8Array(hashBuf));
+  return hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function getAdminFromSession(request, env) {
+  const db = env.DB;
+  if (!db) return null;
+
+  // 1. Cloudflare Access header
   const cfEmail = request.headers.get('cf-access-authenticated-user-email');
-  if (cfEmail) return cfEmail.toLowerCase();
+  if (cfEmail) {
+    const row = await db.prepare('SELECT email, name FROM super_admins WHERE email = ?').bind(cfEmail.toLowerCase()).first();
+    if (row) return row;
+  }
+
+  // 2. Token de Sesión en Header Authorization: Bearer <session_token>
   const authHeader = request.headers.get('Authorization') || '';
   if (authHeader.startsWith('Bearer ')) {
-    return authHeader.slice(7).trim().toLowerCase();
+    const token = authHeader.slice(7).trim();
+    if (token) {
+      const nowIso = new Date().toISOString();
+      const admin = await db.prepare(`
+        SELECT email, name FROM super_admins 
+        WHERE session_token = ? AND (session_expires_at IS NULL OR session_expires_at > ?)
+      `).bind(token, nowIso).first();
+      if (admin) return admin;
+    }
   }
-  const url = new URL(request.url);
-  const adminKey = url.searchParams.get('admin_key') || request.headers.get('X-Admin-Key');
+
+  // 3. Fallback de clave de administración para scripts autorizados
+  const adminKey = request.headers.get('X-Admin-Key');
   if (adminKey && adminKey === (env.ADMIN_SECRET_KEY || 'tutaller-admin-2026')) {
-    return (env.SUPER_ADMIN_EMAIL || SUPER_ADMIN_DEFAULT).toLowerCase();
+    return { email: (env.SUPER_ADMIN_EMAIL || SUPER_ADMIN_DEFAULT).toLowerCase(), name: 'Matías Barrios' };
   }
+
   return null;
 }
 
@@ -55,21 +84,77 @@ export default {
       const db = env.DB;
       if (!db) return json({ error: 'Database binding missing' }, 500);
 
-      const email = getAdminEmail(request, env);
-      const superAdminEmail = (env.SUPER_ADMIN_EMAIL || SUPER_ADMIN_DEFAULT).toLowerCase();
+      // Endpoint de Login (Público)
+      if (url.pathname === '/api/admin/auth/login' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const email = (body.email || '').trim().toLowerCase();
+        const password = body.password || '';
 
-      // Permitir si coincide con el correo del super admin o si está en la tabla super_admins
-      let isSuperAdmin = email && email === superAdminEmail;
-      if (!isSuperAdmin && email) {
-        try {
-          const row = await db.prepare('SELECT email FROM super_admins WHERE email = ?').bind(email).first();
-          if (row) isSuperAdmin = true;
-        } catch {}
+        if (!email || !password) {
+          return json({ error: 'Ingresá tu correo y contraseña.' }, 400);
+        }
+
+        const admin = await db.prepare('SELECT email, name, password_hash FROM super_admins WHERE email = ?').bind(email).first();
+        if (!admin) {
+          return json({ error: 'Credenciales inválidas. Verificá tu correo.' }, 401);
+        }
+
+        const inputHash = await hashPassword(password);
+        if (!admin.password_hash || admin.password_hash !== inputHash) {
+          return json({ error: 'Contraseña incorrecta.' }, 401);
+        }
+
+        // Generar sesión segura de 30 días
+        const sessionToken = crypto.randomUUID() + '-' + crypto.randomUUID();
+        const sessionExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
+
+        await db.prepare('UPDATE super_admins SET session_token = ?, session_expires_at = ? WHERE email = ?')
+          .bind(sessionToken, sessionExpiresAt, email).run();
+
+        return json({
+          success: true,
+          token: sessionToken,
+          admin: { email: admin.email, name: admin.name }
+        });
       }
 
-      // Si no es super admin y no viene clave de administración
-      if (!isSuperAdmin) {
-        return json({ error: 'Acceso no autorizado al panel Super-Admin' }, 401);
+      // Verificación de autenticación para todas las demás rutas de Super Admin
+      const currentAdmin = await getAdminFromSession(request, env);
+      if (!currentAdmin) {
+        return json({ error: 'Acceso no autorizado al panel Super-Admin. Iniciá sesión.' }, 401);
+      }
+
+      // Endpoint: Info del Administrador logueado
+      if (url.pathname === '/api/admin/auth/me' && request.method === 'GET') {
+        return json({ admin: currentAdmin });
+      }
+
+      // Endpoint: Cerrar Sesión
+      if (url.pathname === '/api/admin/auth/logout' && request.method === 'POST') {
+        await db.prepare('UPDATE super_admins SET session_token = NULL, session_expires_at = NULL WHERE email = ?')
+          .bind(currentAdmin.email).run();
+        return json({ success: true });
+      }
+
+      // Endpoint: Cambiar Contraseña
+      if (url.pathname === '/api/admin/auth/change-password' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const currentPassword = body.current_password || '';
+        const newPassword = (body.new_password || '').trim();
+
+        if (newPassword.length < 8) {
+          return json({ error: 'La nueva contraseña debe tener al menos 8 caracteres.' }, 400);
+        }
+
+        const admin = await db.prepare('SELECT password_hash FROM super_admins WHERE email = ?').bind(currentAdmin.email).first();
+        const currentHash = await hashPassword(currentPassword);
+        if (admin.password_hash && admin.password_hash !== currentHash) {
+          return json({ error: 'La contraseña actual ingresada es incorrecta.' }, 400);
+        }
+
+        const newHash = await hashPassword(newPassword);
+        await db.prepare('UPDATE super_admins SET password_hash = ? WHERE email = ?').bind(newHash, currentAdmin.email).run();
+        return json({ success: true });
       }
 
       // 1. Métricas generales

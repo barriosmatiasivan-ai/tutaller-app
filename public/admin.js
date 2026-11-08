@@ -31,16 +31,52 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
+function getToken() {
+  return localStorage.getItem('tutaller_admin_token') || '';
+}
+
+function setToken(token) {
+  localStorage.setItem('tutaller_admin_token', token);
+}
+
+function clearToken() {
+  localStorage.removeItem('tutaller_admin_token');
+}
+
+function showLoginView(errorMsg = '') {
+  document.querySelector('#dashboard-view').style.display = 'none';
+  const loginView = document.querySelector('#login-view');
+  loginView.style.display = 'flex';
+  const errEl = document.querySelector('#login-error');
+  if (errorMsg) {
+    errEl.textContent = errorMsg;
+    errEl.style.display = 'block';
+  } else {
+    errEl.style.display = 'none';
+  }
+}
+
+function showDashboardView(admin = {}) {
+  document.querySelector('#login-view').style.display = 'none';
+  document.querySelector('#dashboard-view').style.display = 'block';
+  const badge = document.querySelector('#admin-user-badge');
+  if (badge) {
+    badge.textContent = `👤 ${admin.name || admin.email || 'Matías Barrios'}`;
+  }
+}
+
 async function api(path, options = {}) {
-  const adminKey = new URLSearchParams(window.location.search).get('admin_key') || 'tutaller-admin-2026';
+  const token = getToken();
   const headers = {
     'Content-Type': 'application/json',
-    'X-Admin-Key': adminKey,
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {})
   };
   const res = await fetch(path, { ...options, headers });
   if (res.status === 401) {
-    throw new Error('No autorizado. Verificá tu acceso de administrador.');
+    clearToken();
+    showLoginView('Sesión expirada o no autorizada. Por favor iniciá sesión nuevamente.');
+    throw new Error('No autorizado');
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -281,7 +317,23 @@ window.deleteWorkshop = async function(id, name) {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-  loadData();
+  async function initAuth() {
+    const token = getToken();
+    if (!token) {
+      showLoginView();
+      return;
+    }
+
+    try {
+      const res = await api('/api/admin/auth/me');
+      showDashboardView(res.admin || {});
+      await loadData();
+    } catch {
+      showLoginView();
+    }
+  }
+
+  initAuth();
 
   // Búsqueda y Filtros
   document.querySelector('#search-input').addEventListener('input', renderWorkshops);
@@ -393,6 +445,88 @@ document.addEventListener('DOMContentLoaded', () => {
       } finally {
         purgeBtn.disabled = false;
         purgeBtn.innerHTML = '<span>⚡</span> Ejecutar Purga Manual Ahora';
+      }
+    });
+  }
+
+  // Manejo de Inicio de Sesión
+  const loginForm = document.querySelector('#login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const submitBtn = document.querySelector('#login-submit-btn');
+      const errEl = document.querySelector('#login-error');
+      errEl.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verificando... ⏳';
+
+      const email = document.querySelector('#login-email').value.trim();
+      const password = document.querySelector('#login-password').value;
+
+      try {
+        const res = await fetch('/api/admin/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Credenciales inválidas.');
+
+        setToken(data.token);
+        showDashboardView(data.admin || { email });
+        toast(`¡Bienvenido ${data.admin?.name || 'Administrador'}!`);
+        await loadData();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Iniciar Sesión 🔐';
+      }
+    });
+  }
+
+  // Cerrar Sesión
+  const logoutBtn = document.querySelector('#logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await api('/api/admin/auth/logout', { method: 'POST' }).catch(() => {});
+      } finally {
+        clearToken();
+        showLoginView();
+        toast('Sesión cerrada.');
+      }
+    });
+  }
+
+  // Modal Cambiar Contraseña
+  const changePwdModal = document.querySelector('#change-pwd-modal');
+  const openChangePwdBtn = document.querySelector('#open-change-pwd-btn');
+  const closeChangePwdBtn = document.querySelector('#close-change-pwd-modal');
+  const cancelChangePwdBtn = document.querySelector('#cancel-change-pwd-btn');
+  const changePwdForm = document.querySelector('#change-pwd-form');
+
+  if (openChangePwdBtn && changePwdModal) {
+    openChangePwdBtn.addEventListener('click', () => changePwdModal.showModal());
+    closeChangePwdBtn.addEventListener('click', () => changePwdModal.close());
+    cancelChangePwdBtn.addEventListener('click', () => changePwdModal.close());
+
+    changePwdForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const current_password = document.querySelector('#pwd-current').value;
+      const new_password = document.querySelector('#pwd-new').value;
+
+      try {
+        await api('/api/admin/auth/change-password', {
+          method: 'POST',
+          body: JSON.stringify({ current_password, new_password })
+        });
+        toast('¡Contraseña maestra actualizada con éxito!');
+        changePwdModal.close();
+        changePwdForm.reset();
+      } catch (err) {
+        toast(err.message, true);
       }
     });
   }

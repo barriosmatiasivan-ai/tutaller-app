@@ -8,21 +8,60 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
 </head>
 <body>
-  <div class="container">
-    <header class="admin-header">
-      <div class="brand">
-        <span class="brand-badge">Super-Admin</span>
-        <div>
-          <h1>Tu Taller Soft</h1>
-          <p class="admin-meta">Panel Central de Control y Gestión de Talleres Clientes</p>
+  <!-- Vista de Login (Exclusiva Super-Admin) -->
+  <div id="login-view" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div class="kpi-card" style="max-width: 440px; width: 100%; padding: 36px 30px; border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 16px 45px rgba(0,0,0,0.6);">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <span class="brand-badge" style="font-size: 13px; padding: 6px 14px; letter-spacing: 1px;">🔒 ACCESO RESTRINGIDO</span>
+        <h2 style="color: #fff; margin-top: 16px; font-size: 24px; font-weight: 800;">Super-Admin</h2>
+        <p class="admin-meta" style="margin-top: 6px;">Panel Central de Gestión · Tu Taller Soft</p>
+      </div>
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-email">Correo del Dueño / Administrador</label>
+          <input type="email" id="login-email" required value="barriosmatiasivan@gmail.com" placeholder="correo@ejemplo.com">
         </div>
-      </div>
-      <div>
-        <button class="primary" id="open-create-modal">
-          <span>＋</span> Habilitar Nuevo Taller
+        <div class="form-group">
+          <label for="login-password">Contraseña Maestra</label>
+          <input type="password" id="login-password" required placeholder="••••••••">
+        </div>
+        <div id="login-error" style="color: #ef4444; font-size: 13px; margin-bottom: 14px; display: none; font-weight: 600;"></div>
+        <button type="submit" class="primary" id="login-submit-btn" style="width: 100%; padding: 13px; font-size: 15px; font-weight: 700;">
+          Iniciar Sesión 🔐
         </button>
+      </form>
+      <div style="text-align: center; margin-top: 20px; font-size: 11px; color: var(--text-muted);">
+        Sesión protegida por token criptográfico de 30 días
       </div>
-    </header>
+    </div>
+  </div>
+
+  <!-- Vista del Dashboard (Solo autenticado) -->
+  <div id="dashboard-view" style="display:none;">
+    <div class="container">
+      <header class="admin-header">
+        <div class="brand">
+          <span class="brand-badge">Super-Admin</span>
+          <div>
+            <h1>Tu Taller Soft</h1>
+            <p class="admin-meta">Panel Central de Control y Gestión de Talleres Clientes</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span id="admin-user-badge" class="brand-badge" style="text-transform:none;font-size:12px;display:inline-flex;align-items:center;gap:6px;">
+            👤 Matías Barrios
+          </span>
+          <button class="primary" id="open-create-modal">
+            <span>＋</span> Habilitar Nuevo Taller
+          </button>
+          <button class="secondary" id="open-change-pwd-btn" title="Cambiar Contraseña">
+            🔑
+          </button>
+          <button class="secondary" id="logout-btn" title="Cerrar Sesión" style="color:#ef4444;">
+            🚪 Salir
+          </button>
+        </div>
+      </header>
 
     <!-- Key Metrics Grid -->
     <section class="kpi-grid">
@@ -137,6 +176,7 @@
       </div>
     </section>
   </div>
+</div><!-- /dashboard-view -->
 
   <!-- Modal: Crear Nuevo Taller -->
   <dialog id="create-modal">
@@ -222,6 +262,28 @@
       <div class="modal-footer">
         <button type="button" class="secondary" id="cancel-renew-btn">Cancelar</button>
         <button type="submit" class="primary">Aplicar Renovación</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Cambiar Contraseña -->
+  <dialog id="change-pwd-modal" style="max-width:440px;">
+    <div class="modal-header">
+      <h2>Cambiar Contraseña Maestra</h2>
+      <button class="close-btn" id="close-change-pwd-modal">✕</button>
+    </div>
+    <form id="change-pwd-form">
+      <div class="form-group">
+        <label for="pwd-current">Contraseña Actual *</label>
+        <input type="password" id="pwd-current" required placeholder="••••••••">
+      </div>
+      <div class="form-group">
+        <label for="pwd-new">Nueva Contraseña (mínimo 8 caracteres) *</label>
+        <input type="password" id="pwd-new" required minlength="8" placeholder="••••••••">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="secondary" id="cancel-change-pwd-btn">Cancelar</button>
+        <button type="submit" class="primary">Actualizar Contraseña</button>
       </div>
     </form>
   </dialog>

@@ -237,9 +237,9 @@ function updateBrandUI() {
   if (!currentWorkshop) return;
   const name = currentWorkshop.name || 'Mi Taller';
   document.title = `${name} · Tu Taller`;
-  const isLifetime = currentWorkshop.is_lifetime || (Date.parse(currentWorkshop.expires_at || '') > Date.parse('2090-01-01'));
+  const isLifetime = currentWorkshop.is_lifetime || (Date.parse(currentWorkshop.expires_at || '') > Date.parse('2090-01-01')) || (currentWorkshop.days_remaining && currentWorkshop.days_remaining >= 30000);
   const planLabel = currentWorkshop.plan === 'pro' ? 'Plan Pro ⭐' : 'Plan Básico 🥉';
-  const vigenciaLabel = isLifetime ? 'Acceso Vitalicio 👑' : `${currentWorkshop.days_remaining || 0} días restantes`;
+  const vigenciaLabel = isLifetime ? 'Vitalicio 👑' : `${currentWorkshop.days_remaining || 0} días restantes`;
   setText('#sidebar-plan-label', `${planLabel} · ${vigenciaLabel}`);
 
   const logoImg = document.querySelector('#sidebar-logo');

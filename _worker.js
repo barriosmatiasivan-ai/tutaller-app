@@ -259,12 +259,6 @@ export default {
       }
     }
 
-    // Servir /admin.html cuando se accede a /admin
-    if (url.pathname === '/admin') {
-      const adminReq = new Request(new URL('/admin.html', request.url), request);
-      return env.ASSETS.fetch(adminReq);
-    }
-
     // Servir archivos estáticos del frontend
     return env.ASSETS.fetch(request);
   }

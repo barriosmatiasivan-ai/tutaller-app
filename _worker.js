@@ -345,7 +345,7 @@ export default {
           const expiresMs = Date.parse(w.expires_at) || 0;
           const isLifetime = w.plan === 'lifetime' || (expiresMs && expiresMs > Date.parse('2090-01-01'));
           const remainingMs = expiresMs - now;
-          const daysRemaining = isLifetime ? 99999 : Math.ceil(remainingMs / (86400000));
+          const daysRemaining = isLifetime ? null : Math.ceil(remainingMs / (86400000));
           const isExpired = isLifetime ? false : remainingMs <= 0;
 
           const [thisWeekRes, lastWeekRes] = await Promise.all([
@@ -576,7 +576,7 @@ export default {
       const now = Date.now();
       const expiresMs = Date.parse(workshop.expires_at) || 0;
       const isLifetime = (expiresMs && expiresMs > Date.parse('2090-01-01')) || workshop.plan === 'lifetime';
-      const daysRemaining = isLifetime ? 99999 : Math.max(0, Math.ceil((expiresMs - now) / 86400000));
+      const daysRemaining = isLifetime ? null : Math.max(0, Math.ceil((expiresMs - now) / 86400000));
       const isExpired = isLifetime ? false : expiresMs <= now;
       const effectivePlan = workshop.plan === 'lifetime' ? 'pro' : workshop.plan;
 
@@ -915,12 +915,16 @@ export default {
         }
       }
       const tallerReq = new Request(new URL('/taller/?slug=' + encodeURIComponent(slug), request.url), request);
-      return env.ASSETS.fetch(tallerReq);
+      const tRes = await env.ASSETS.fetch(tallerReq);
+      const tHeaders = new Headers(tRes.headers);
+      tHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      tHeaders.set('Pragma', 'no-cache');
+      return new Response(tRes.body, { status: tRes.status, headers: tHeaders });
     }
 
-    // Servir archivos estáticos del frontend (sin cache para el panel admin)
+    // Servir archivos estáticos del frontend (sin cache para /admin y /taller)
     const assetRes = await env.ASSETS.fetch(request);
-    if (url.pathname.startsWith('/admin') || url.pathname === '/admin.js') {
+    if (url.pathname.startsWith('/admin') || url.pathname.startsWith('/taller') || url.pathname === '/admin.js') {
       const resHeaders = new Headers(assetRes.headers);
       resHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
       resHeaders.set('Pragma', 'no-cache');

@@ -99,6 +99,43 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Mantenimiento de Almacenamiento & Purga de Fotos -->
+    <section class="maintenance-section">
+      <div class="maintenance-header">
+        <div class="maintenance-title">
+          <span>🧹</span>
+          <div>
+            <h3>Almacenamiento Cloudflare R2 & Purga Inteligente</h3>
+            <span class="admin-meta">Retención de 6 meses para fotos de recepción en órdenes entregadas</span>
+          </div>
+        </div>
+        <button class="secondary" id="trigger-purge-btn">
+          <span>⚡</span> Ejecutar Purga Manual Ahora
+        </button>
+      </div>
+      <p class="maintenance-desc">
+        Las fotos de recepción protegen al taller ante reclamos inmediatos. Pasados los 6 meses de entregado el equipo, las imágenes se purgan de la nube conservando la orden y todo el historial de texto, manteniendo tus costos de servidor en $0 de forma permanente.
+      </p>
+      <div class="storage-stats-grid">
+        <div class="storage-stat-box">
+          <span class="storage-stat-label">Órdenes listas para purga (+6m)</span>
+          <span class="storage-stat-val" id="storage-pending-orders">0</span>
+        </div>
+        <div class="storage-stat-box">
+          <span class="storage-stat-label">Fotos eliminadas históricamente</span>
+          <span class="storage-stat-val" id="storage-purged-photos">0</span>
+        </div>
+        <div class="storage-stat-box">
+          <span class="storage-stat-label">Espacio liberado acumulado</span>
+          <span class="storage-stat-val" id="storage-freed-mb">0 MB</span>
+        </div>
+        <div class="storage-stat-box">
+          <span class="storage-stat-label">Última ejecución automática</span>
+          <span class="storage-stat-val" id="storage-last-run" style="font-size: 14px; font-weight: 600;">Nunca</span>
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- Modal: Crear Nuevo Taller -->

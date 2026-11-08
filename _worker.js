@@ -257,9 +257,123 @@ export default {
         await db.prepare('DELETE FROM workshops WHERE id = ?').bind(id).run();
         return json({ success: true });
       }
+
+      // 8. Estado del almacenamiento y fotos candidatas a purga
+      if (url.pathname === '/api/admin/maintenance/storage' && request.method === 'GET') {
+        const sixMonthsAgo = new Date(Date.now() - 180 * 86400000).toISOString();
+        
+        const pendingOrdersRes = await db.prepare(`
+          SELECT COUNT(*) as count 
+          FROM repair_orders 
+          WHERE status = 'delivered' 
+            AND updated_at <= ? 
+            AND (photos_purged_at IS NULL OR photos_purged_at = '')
+        `).bind(sixMonthsAgo).first();
+
+        const historyRes = await db.prepare(`
+          SELECT 
+            COALESCE(SUM(photos_deleted), 0) as total_photos_deleted,
+            COALESCE(SUM(bytes_freed), 0) as total_bytes_freed,
+            COUNT(*) as total_runs
+          FROM storage_maintenance_logs
+        `).first();
+
+        const lastLog = await db.prepare(`
+          SELECT * FROM storage_maintenance_logs 
+          ORDER BY executed_at DESC 
+          LIMIT 1
+        `).first();
+
+        return json({
+          pending_purge_orders: pendingOrdersRes?.count || 0,
+          total_photos_purged: historyRes?.total_photos_deleted || 0,
+          total_bytes_freed: historyRes?.total_bytes_freed || 0,
+          total_runs: historyRes?.total_runs || 0,
+          last_run: lastLog || null
+        });
+      }
+
+      // 9. Ejecutar purga manual de fotos (+180 días)
+      if (url.pathname === '/api/admin/maintenance/purge-photos' && request.method === 'POST') {
+        const result = await purgeOldOrderPhotos(env, 'manual');
+        return json({ success: true, ...result });
+      }
     }
 
     // Servir archivos estáticos del frontend
     return env.ASSETS.fetch(request);
+  },
+
+  // Disparador programado (Cron Job mensual)
+  async scheduled(event, env, ctx) {
+    if (ctx && ctx.waitUntil) {
+      ctx.waitUntil(purgeOldOrderPhotos(env, 'cron'));
+    } else {
+      await purgeOldOrderPhotos(env, 'cron');
+    }
   }
 };
+
+async function purgeOldOrderPhotos(env, triggerType = 'manual') {
+  const db = env.DB;
+  const files = env.FILES;
+  if (!db) throw new Error('Database binding missing');
+
+  // 180 días atrás (6 meses)
+  const sixMonthsAgo = new Date(Date.now() - 180 * 86400000).toISOString();
+
+  // Buscar órdenes entregadas hace más de 180 días que no hayan sido purgadas
+  const query = await db.prepare(`
+    SELECT id, workshop_id, order_number, status, updated_at 
+    FROM repair_orders 
+    WHERE status = 'delivered' 
+      AND updated_at <= ? 
+      AND (photos_purged_at IS NULL OR photos_purged_at = '')
+    LIMIT 200
+  `).bind(sixMonthsAgo).all();
+
+  const candidates = query.results || [];
+  let ordersProcessed = 0;
+  let photosDeleted = 0;
+  let bytesFreed = 0;
+  const nowIso = new Date().toISOString();
+
+  for (const order of candidates) {
+    if (files) {
+      const prefixes = [`${order.id}/`, `${order.workshop_id}/${order.id}/`];
+      for (const prefix of prefixes) {
+        try {
+          const listRes = await files.list({ prefix, limit: 30 });
+          if (listRes && listRes.objects) {
+            for (const obj of listRes.objects) {
+              await files.delete(obj.key);
+              photosDeleted++;
+              bytesFreed += (obj.size || 0);
+            }
+          }
+        } catch (err) {
+          console.error('Error al listar/borrar fotos en R2 para orden:', order.id, err);
+        }
+      }
+    }
+
+    // Marcar orden como purgada
+    await db.prepare('UPDATE repair_orders SET photos_purged_at = ? WHERE id = ?')
+      .bind(nowIso, order.id).run();
+    ordersProcessed++;
+  }
+
+  // Registrar auditoría de mantenimiento
+  const logId = crypto.randomUUID();
+  await db.prepare(`
+    INSERT INTO storage_maintenance_logs (id, trigger_type, orders_count, photos_deleted, bytes_freed, executed_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(logId, triggerType, ordersProcessed, photosDeleted, bytesFreed, nowIso).run();
+
+  return {
+    orders_processed: ordersProcessed,
+    photos_deleted: photosDeleted,
+    bytes_freed: bytesFreed,
+    executed_at: nowIso
+  };
+}

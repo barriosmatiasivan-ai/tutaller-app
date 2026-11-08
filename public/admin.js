@@ -51,9 +51,10 @@ async function api(path, options = {}) {
 
 async function loadData() {
   try {
-    const [metricsData, workshopsData] = await Promise.all([
+    const [metricsData, workshopsData, storageData] = await Promise.all([
       api('/api/admin/metrics'),
-      api('/api/admin/workshops')
+      api('/api/admin/workshops'),
+      api('/api/admin/maintenance/storage').catch(() => null)
     ]);
 
     // Actualizar KPIs
@@ -63,6 +64,19 @@ async function loadData() {
     document.querySelector('#kpi-suspended').textContent = metricsData.suspended_or_expired;
     document.querySelector('#kpi-orders').textContent = metricsData.orders_this_week;
     document.querySelector('#kpi-churn').textContent = metricsData.churn_risk_workshops;
+
+    // Actualizar Métricas de Almacenamiento
+    if (storageData) {
+      document.querySelector('#storage-pending-orders').textContent = storageData.pending_purge_orders || 0;
+      document.querySelector('#storage-purged-photos').textContent = storageData.total_photos_purged || 0;
+      const mbFreed = ((storageData.total_bytes_freed || 0) / (1024 * 1024)).toFixed(2);
+      document.querySelector('#storage-freed-mb').textContent = `${mbFreed} MB`;
+      if (storageData.last_run && storageData.last_run.executed_at) {
+        document.querySelector('#storage-last-run').textContent = formatDate(storageData.last_run.executed_at);
+      } else {
+        document.querySelector('#storage-last-run').textContent = 'Pendiente de ciclo';
+      }
+    }
 
     allWorkshops = workshopsData.workshops || [];
     renderWorkshops();
@@ -330,4 +344,36 @@ document.addEventListener('DOMContentLoaded', () => {
       toast(err.message, true);
     }
   });
+
+  // Botón Ejecutar Purga Manual de Fotos (+6 meses)
+  const purgeBtn = document.querySelector('#trigger-purge-btn');
+  if (purgeBtn) {
+    purgeBtn.addEventListener('click', async () => {
+      const ok = confirm(
+        '¿Deseas ejecutar la purga de fotos de recepción para todas las órdenes marcadas como "Entregadas" hace más de 6 meses?\n\n' +
+        '• Se liberará espacio en el bucket R2.\n' +
+        '• El historial técnico, datos del cliente, fallas, repuestos y montos permanecerán intactos.\n' +
+        '• Esta acción no se puede deshacer.'
+      );
+      if (!ok) return;
+
+      purgeBtn.disabled = true;
+      purgeBtn.innerHTML = '<span>⏳</span> Procesando purga...';
+
+      try {
+        const res = await api('/api/admin/maintenance/purge-photos', {
+          method: 'POST'
+        });
+
+        const mb = ((res.bytes_freed || 0) / (1024 * 1024)).toFixed(2);
+        toast(`Purga completada: ${res.orders_processed} órdenes revisadas, ${res.photos_deleted} fotos eliminadas (${mb} MB liberados).`);
+        await loadData();
+      } catch (err) {
+        toast(`Error al ejecutar purga: ${err.message}`, true);
+      } finally {
+        purgeBtn.disabled = false;
+        purgeBtn.innerHTML = '<span>⚡</span> Ejecutar Purga Manual Ahora';
+      }
+    });
+  }
 });

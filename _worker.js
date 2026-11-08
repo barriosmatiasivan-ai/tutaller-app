@@ -376,7 +376,10 @@ export default {
             WHERE ro.workshop_id = ? ORDER BY ro.order_number DESC
           `).bind(workshop.id).all(),
           db.prepare('SELECT * FROM stock_products WHERE workshop_id = ? ORDER BY name ASC').bind(workshop.id).all(),
-          db.prepare('SELECT * FROM cash_entries WHERE workshop_id = ? ORDER BY created_at DESC LIMIT 50').bind(workshop.id).all()
+          db.prepare(`
+            SELECT id, workshop_id, (CAST(amount_cents AS REAL) / 100) as amount, kind as type, payment_method, notes as concept, created_at 
+            FROM cash_entries WHERE workshop_id = ? ORDER BY created_at DESC LIMIT 50
+          `).bind(workshop.id).all()
         ]);
 
         return json({
@@ -509,17 +512,17 @@ export default {
       // 7. Registrar caja
       if (subRoute === 'cash' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));
-        const amount = Number(body.amount || 0);
-        const type = body.type === 'out' ? 'out' : 'in';
+        const amountCents = Math.round(Number(body.amount || 0) * 100);
+        const kind = body.type === 'out' ? 'out' : 'in';
         const method = body.payment_method || 'efectivo';
-        const concept = body.concept || 'Movimiento de caja';
+        const notes = body.concept || 'Movimiento de caja';
         const nowIso = new Date().toISOString();
         const entryId = crypto.randomUUID();
 
         await db.prepare(`
-          INSERT INTO cash_entries (id, workshop_id, amount, type, payment_method, concept, created_at)
+          INSERT INTO cash_entries (id, workshop_id, amount_cents, kind, payment_method, notes, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).bind(entryId, workshop.id, amount, type, method, concept, nowIso).run();
+        `).bind(entryId, workshop.id, amountCents, kind, method, notes, nowIso).run();
 
         return json({ success: true, id: entryId }, 201);
       }

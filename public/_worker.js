@@ -490,8 +490,16 @@ export default {
           await db.prepare('UPDATE workshops SET plan = ?, expires_at = ?, status = ?, updated_at = ? WHERE id = ?')
             .bind(newPlan, newExpiresAt, 'active', new Date().toISOString(), id).run();
         } else {
-          await db.prepare('UPDATE workshops SET plan = ?, updated_at = ? WHERE id = ?')
-            .bind(newPlan, new Date().toISOString(), id).run();
+          const current = await db.prepare('SELECT expires_at FROM workshops WHERE id = ?').bind(id).first();
+          const curExp = current?.expires_at ? Date.parse(current.expires_at) : 0;
+          if (curExp > Date.parse('2090-01-01')) {
+            const next30Days = new Date(Date.now() + 30 * 86400000).toISOString();
+            await db.prepare('UPDATE workshops SET plan = ?, expires_at = ?, updated_at = ? WHERE id = ?')
+              .bind(newPlan, next30Days, new Date().toISOString(), id).run();
+          } else {
+            await db.prepare('UPDATE workshops SET plan = ?, updated_at = ? WHERE id = ?')
+              .bind(newPlan, new Date().toISOString(), id).run();
+          }
         }
         return json({ success: true, plan: newPlan });
       }
@@ -577,8 +585,9 @@ export default {
 
       const now = Date.now();
       const expiresMs = Date.parse(workshop.expires_at) || 0;
-      const daysRemaining = Math.max(0, Math.ceil((expiresMs - now) / 86400000));
-      const isExpired = expiresMs <= now;
+      const isLifetime = workshop.plan === 'lifetime' || (expiresMs && expiresMs > Date.parse('2090-01-01'));
+      const daysRemaining = isLifetime ? 99999 : Math.max(0, Math.ceil((expiresMs - now) / 86400000));
+      const isExpired = isLifetime ? false : expiresMs <= now;
 
       await ensureAuthSchema(db);
 
@@ -597,6 +606,8 @@ export default {
             id: workshop.id,
             name: workshop.name,
             slug: workshop.slug,
+            plan: workshop.plan,
+            is_lifetime: isLifetime,
             country: workshop.country,
             currency: workshop.currency,
             payment_methods: workshop.payment_methods,
@@ -736,7 +747,7 @@ export default {
         ]);
 
         return json({
-          workshop: { ...workshop, days_remaining: daysRemaining, is_expired: isExpired },
+          workshop: { ...workshop, is_lifetime: isLifetime, days_remaining: daysRemaining, is_expired: isExpired },
           settings: settings || {},
           clients: clientsRes?.results || [],
           orders: ordersRes?.results || [],

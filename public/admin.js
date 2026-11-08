@@ -227,7 +227,6 @@ function renderWorkshops() {
     }
 
     const openLink = `<a href="/t/${w.slug}" target="_blank" class="secondary" title="Abrir Taller del Técnico" style="text-decoration:none;display:inline-flex;align-items:center;padding:6px 9px;">🔗</a>`;
-    const nextPlanLabel = w.plan === 'basic' ? '⭐ Pro' : w.plan === 'pro' ? '👑 Vitalicio' : 'Básico';
 
     return `
       <tr>
@@ -266,8 +265,8 @@ function renderWorkshops() {
             <button class="secondary" onclick="toggleStatus('${w.id}', '${w.status}')" title="${w.status === 'active' ? 'Suspender taller' : 'Reactivar taller'}">
               ${w.status === 'active' ? '⏸️' : '▶️'}
             </button>
-            <button class="secondary" onclick="togglePlan('${w.id}', '${w.plan}')" title="Cambiar a ${nextPlanLabel}">
-              🔄 ${nextPlanLabel}
+            <button class="secondary" onclick="openPlanModal('${w.id}', '${esc(w.name)}', '${w.plan}')" title="Modificar plan de suscripción">
+              🏷️ Plan
             </button>
             <button class="secondary" onclick="deleteWorkshop('${w.id}', '${esc(w.name)}')" title="Eliminar taller" style="color:#ef4444;">🗑️</button>
           </div>
@@ -295,20 +294,16 @@ window.toggleStatus = async function(id, currentStatus) {
   }
 };
 
-window.togglePlan = async function(id, currentPlan) {
-  const planCycle = { basic: 'pro', pro: 'lifetime', lifetime: 'basic' };
-  const newPlan = planCycle[currentPlan] || 'basic';
-  const label = newPlan === 'lifetime' ? 'VITALICIO 👑' : newPlan === 'pro' ? 'PRO ⭐' : 'BÁSICO';
-  try {
-    await api(`/api/admin/workshops/${id}/plan`, {
-      method: 'POST',
-      body: JSON.stringify({ plan: newPlan })
-    });
-    toast(`Plan actualizado a ${label}.`);
-    await loadData();
-  } catch (err) {
-    toast(err.message, true);
-  }
+window.openPlanModal = function(id, name, currentPlan) {
+  document.querySelector('#plan-target-id').value = id;
+  const planNames = { lifetime: '👑 Vitalicio (Acceso Permanente)', pro: '⭐ Pro', basic: '🥉 Básico' };
+  document.querySelector('#plan-target-name').textContent = `${name} · Plan actual: ${planNames[currentPlan] || currentPlan}`;
+  document.querySelector('#plan-select').value = currentPlan || 'basic';
+  document.querySelector('#plan-modal').showModal();
+};
+
+window.togglePlan = function(id, currentPlan) {
+  window.openPlanModal(id, '', currentPlan);
 };
 
 window.openRenewModal = function(id, name) {
@@ -441,6 +436,37 @@ document.addEventListener('DOMContentLoaded', () => {
       toast(err.message, true);
     }
   });
+
+  // Modal Cambiar Plan
+  const planModal = document.querySelector('#plan-modal');
+  if (planModal) {
+    document.querySelector('#close-plan-modal')?.addEventListener('click', () => planModal.close());
+    document.querySelector('#cancel-plan-btn')?.addEventListener('click', () => planModal.close());
+
+    document.querySelector('#plan-form')?.addEventListener('submit', async e => {
+      e.preventDefault();
+      const submitBtn = e.submitter;
+      if (submitBtn) submitBtn.disabled = true;
+
+      const id = document.querySelector('#plan-target-id').value;
+      const plan = document.querySelector('#plan-select').value;
+      const planNames = { lifetime: '👑 Vitalicio (Acceso Permanente)', pro: '⭐ Pro', basic: '🥉 Básico' };
+
+      try {
+        await api(`/api/admin/workshops/${id}/plan`, {
+          method: 'POST',
+          body: JSON.stringify({ plan })
+        });
+        toast(`¡Plan actualizado a ${planNames[plan] || plan} con éxito!`);
+        planModal.close();
+        await loadData();
+      } catch (err) {
+        toast(err.message, true);
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
 
   // Botón Ejecutar Purga Manual de Fotos (+6 meses)
   const purgeBtn = document.querySelector('#trigger-purge-btn');

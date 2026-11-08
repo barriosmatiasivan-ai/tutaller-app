@@ -295,6 +295,30 @@
     </form>
   </dialog>
 
+  <!-- Modal: Cambiar Plan -->
+  <dialog id="plan-modal" style="max-width:440px;">
+    <div class="modal-header">
+      <h2>Cambiar Plan de Suscripción</h2>
+      <button class="close-btn" id="close-plan-modal">✕</button>
+    </div>
+    <form id="plan-form">
+      <input type="hidden" id="plan-target-id">
+      <p id="plan-target-name" style="margin-bottom: 16px; font-weight: 700; color: #ffffff;"></p>
+      <div class="form-group">
+        <label for="plan-select">Seleccionar Plan</label>
+        <select id="plan-select" required>
+          <option value="basic">🥉 Plan Básico</option>
+          <option value="pro">⭐ Plan Pro</option>
+          <option value="lifetime">👑 Plan Vitalicio (Acceso permanente sin vencimiento)</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="secondary" id="cancel-plan-btn">Cancelar</button>
+        <button type="submit" class="primary">Guardar Plan</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Toast -->
   <div id="toast"></div>
 

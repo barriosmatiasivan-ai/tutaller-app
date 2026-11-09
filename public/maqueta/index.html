@@ -259,18 +259,47 @@
       background: rgba(255, 255, 255, 0.15);
     }
 
+    @media (max-width: 680px) {
+      .style-picker-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 8px 12px;
+      }
+      .style-picker-bar .title {
+        justify-content: space-between;
+      }
+      .style-picker-bar .controls-group {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+      }
+      .segmented-control {
+        flex: 1;
+        display: flex;
+      }
+      .segmented-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 6px 4px;
+        font-size: 11px;
+      }
+    }
+
     /* CONTENEDOR PRINCIPAL DE LA APP */
     .app-viewport {
       flex: 1;
       background: var(--bg-page);
       color: var(--text-main);
       display: grid;
-      grid-template-columns: 240px 1fr;
+      grid-template-columns: 240px minmax(0, 1fr);
       min-height: calc(100vh - 54px);
+      width: 100%;
+      max-width: 100vw;
     }
     @media (max-width: 900px) {
       .app-viewport {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
       .app-sidebar {
         display: none !important;
@@ -380,10 +409,11 @@
       max-width: 1300px;
       margin: 0 auto;
       width: 100%;
+      min-width: 0;
     }
     @media (max-width: 700px) {
       .app-main {
-        padding: 16px;
+        padding: 16px 14px 80px;
       }
     }
 
@@ -400,6 +430,29 @@
       flex: 1;
       min-width: 240px;
       max-width: 480px;
+    }
+    @media (max-width: 700px) {
+      .main-topbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .search-input-box {
+        min-width: 0;
+        max-width: none;
+        width: 100%;
+      }
+      .header-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .header-actions .btn-action,
+      .header-actions .btn-primary {
+        justify-content: center;
+        width: 100%;
+      }
     }
     .search-input-box svg {
       position: absolute;
@@ -703,6 +756,15 @@
       justify-content: space-between;
       gap: 14px;
       font-size: 13px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 700px) {
+      .style-note-banner {
+        padding: 10px 14px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
     }
     .style-note-banner strong {
       color: var(--primary);

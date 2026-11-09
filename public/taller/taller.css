@@ -378,7 +378,7 @@ dialog.custom-dialog::backdrop {
 
 /* En Modo Clásico: mostrar emojis, ocultar iconos SVG Pro */
 .icon-pro {
-  display: none;
+  display: none !important;
 }
 .icon-classic {
   display: inline-block;
@@ -389,7 +389,7 @@ html[data-ui="pro"] .icon-classic {
   display: none !important;
 }
 html[data-ui="pro"] .icon-pro {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
 }

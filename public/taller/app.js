@@ -118,10 +118,19 @@ function clearWorkshopToken() {
 }
 
 function showWorkshopLogin() {
+  document.body.classList.add('is-login');
+  document.body.classList.remove('is-app');
   const loginView = document.querySelector('#workshop-login-view');
   const appLayout = document.querySelector('#app-layout');
-  if (loginView) loginView.style.display = 'flex';
-  if (appLayout) appLayout.style.display = 'none';
+  if (loginView) {
+    loginView.style.display = 'flex';
+    loginView.removeAttribute('hidden');
+  }
+  if (appLayout) {
+    appLayout.style.display = 'none';
+    appLayout.setAttribute('hidden', '');
+    appLayout.classList.add('hidden');
+  }
 
   if (currentWorkshop) {
     setText('#login-workshop-name', currentWorkshop.name || 'Tu Taller');
@@ -131,10 +140,19 @@ function showWorkshopLogin() {
 }
 
 function showWorkshopApp() {
+  document.body.classList.remove('is-login');
+  document.body.classList.add('is-app');
   const loginView = document.querySelector('#workshop-login-view');
   const appLayout = document.querySelector('#app-layout');
-  if (loginView) loginView.style.display = 'none';
-  if (appLayout) appLayout.style.display = '';
+  if (loginView) {
+    loginView.style.display = 'none';
+    loginView.setAttribute('hidden', '');
+  }
+  if (appLayout) {
+    appLayout.style.display = '';
+    appLayout.removeAttribute('hidden');
+    appLayout.classList.remove('hidden');
+  }
 }
 
 async function api(path, options = {}) {

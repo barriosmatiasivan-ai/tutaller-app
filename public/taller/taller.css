@@ -1080,23 +1080,35 @@ html[data-ui="pro"] dialog.custom-dialog dl {
   padding: 12px 14px !important;
 }
 
+/* Estado de Login: Ocultar layout de la app y la barra lateral */
+body.is-login #app-layout,
+body.is-login .sidebar,
+#app-layout[hidden],
+#app-layout.hidden {
+  display: none !important;
+}
+
+body.is-login #workshop-login-view {
+  display: flex !important;
+}
+
 /* Layout and Sidebar Isolation - Guaranteed No Overlap */
 @media (min-width: 701px) {
-  #app-layout,
-  .layout {
+  body:not(.is-login) #app-layout:not([hidden]):not(.hidden),
+  body:not(.is-login) .layout:not([hidden]):not(.hidden) {
     display: grid !important;
     grid-template-columns: 216px minmax(0, 1fr) !important;
     min-height: 100vh;
     width: 100%;
   }
-  .sidebar {
+  body:not(.is-login) .sidebar {
     width: 216px !important;
     position: fixed !important;
     inset: 0 auto 0 0 !important;
     height: 100vh !important;
     z-index: 100;
   }
-  .main {
+  body:not(.is-login) .main {
     grid-column: 2 !important;
     min-width: 0 !important;
     width: 100% !important;
@@ -1104,18 +1116,18 @@ html[data-ui="pro"] dialog.custom-dialog dl {
 }
 
 @media (max-width: 1150px) and (min-width: 701px) {
-  #app-layout,
-  .layout {
+  body:not(.is-login) #app-layout:not([hidden]):not(.hidden),
+  body:not(.is-login) .layout:not([hidden]):not(.hidden) {
     grid-template-columns: 196px minmax(0, 1fr) !important;
   }
-  .sidebar {
+  body:not(.is-login) .sidebar {
     width: 196px !important;
   }
 }
 
 @media (max-width: 700px) {
-  #app-layout,
-  .layout {
+  body:not(.is-login) #app-layout:not([hidden]):not(.hidden),
+  body:not(.is-login) .layout:not([hidden]):not(.hidden) {
     display: block !important;
     width: 100%;
   }

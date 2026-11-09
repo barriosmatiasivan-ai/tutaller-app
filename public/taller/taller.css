@@ -748,8 +748,8 @@ html[data-ui="pro"] .order-card-enhanced .phone-icon {
 }
 
 html[data-ui="pro"] .order-card-enhanced .order-meta {
-  min-width: 150px !important;
-  flex: 1 1 160px !important;
+  min-width: 0 !important;
+  flex: 1 1 120px !important;
 }
 html[data-ui="pro"] .order-card-enhanced .order-meta .device-text {
   font-size: 14.5px !important;
@@ -760,14 +760,14 @@ html[data-ui="pro"] .order-card-enhanced .order-meta .device-text {
 html[data-ui="pro"] .order-card-enhanced .order-meta .fault-text {
   font-size: 12.5px !important;
   color: #94a3b8 !important;
+  max-width: 100% !important;
 }
 
 /* Columna Cliente con Avatar Circular de Iniciales en Modo Pro */
 html[data-ui="pro"] .order-client-pro {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-width: 155px;
+  gap: 8px;
   flex-shrink: 0;
 }
 .client-avatar-pro,

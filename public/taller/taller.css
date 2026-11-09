@@ -1080,6 +1080,56 @@ html[data-ui="pro"] dialog.custom-dialog dl {
   padding: 12px 14px !important;
 }
 
+/* Layout and Sidebar Isolation - Guaranteed No Overlap */
+@media (min-width: 701px) {
+  #app-layout,
+  .layout {
+    display: grid !important;
+    grid-template-columns: 216px minmax(0, 1fr) !important;
+    min-height: 100vh;
+    width: 100%;
+  }
+  .sidebar {
+    width: 216px !important;
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    height: 100vh !important;
+    z-index: 100;
+  }
+  .main {
+    grid-column: 2 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 1150px) and (min-width: 701px) {
+  #app-layout,
+  .layout {
+    grid-template-columns: 196px minmax(0, 1fr) !important;
+  }
+  .sidebar {
+    width: 196px !important;
+  }
+}
+
+@media (max-width: 700px) {
+  #app-layout,
+  .layout {
+    display: block !important;
+    width: 100%;
+  }
+  .sidebar {
+    display: none !important;
+  }
+  .main {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+
 
 
 

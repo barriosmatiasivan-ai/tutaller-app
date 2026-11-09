@@ -618,17 +618,16 @@ export default {
           return json({ error: 'Ingresá un correo electrónico válido.' }, 400);
         }
 
-        // Verificar si el correo pertenece al taller o es el Super-Admin
+        // Verificar si el correo pertenece al taller (dueño o técnico registrado)
         const isOwner = workshop.owner_email && workshop.owner_email.toLowerCase() === email;
-        const isSuperAdmin = email === SUPER_ADMIN_DEFAULT.toLowerCase();
         let registeredUser = null;
 
-        if (!isOwner && !isSuperAdmin) {
+        if (!isOwner) {
           registeredUser = await db.prepare('SELECT id, name, role FROM workshop_users WHERE workshop_id = ? AND LOWER(email) = ?')
             .bind(workshop.id, email).first();
         }
 
-        if (!isOwner && !isSuperAdmin && !registeredUser) {
+        if (!isOwner && !registeredUser) {
           return json({ error: 'Este correo no está registrado en este taller. Consultá con el administrador.' }, 403);
         }
 
@@ -673,18 +672,30 @@ export default {
           return json({ error: 'Código inválido o expirado. Solicitá uno nuevo.' }, 400);
         }
 
+        // Verificar pertenencia al taller
+        const isOwner = workshop.owner_email && workshop.owner_email.toLowerCase() === email;
+        let registeredUser = null;
+        if (!isOwner) {
+          registeredUser = await db.prepare('SELECT id, name, role FROM workshop_users WHERE workshop_id = ? AND LOWER(email) = ?')
+            .bind(workshop.id, email).first();
+        }
+        if (!isOwner && !registeredUser) {
+          return json({ error: 'Este correo no está registrado en este taller.' }, 403);
+        }
+
         // Marcar como usado
         await db.prepare('UPDATE workshop_login_codes SET used = 1 WHERE id = ?').bind(validCode.id).run();
 
         // Crear sesión de 30 días
+        const userRole = isOwner ? 'owner' : (registeredUser?.role || 'technician');
         const sessionToken = crypto.randomUUID() + '-' + crypto.randomUUID();
         const sessionExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
         const sessionId = crypto.randomUUID();
 
         await db.prepare(`
           INSERT INTO workshop_sessions (id, workshop_id, email, role, token, expires_at, created_at)
-          VALUES (?, ?, ?, 'technician', ?, ?, ?)
-        `).bind(sessionId, workshop.id, email, sessionToken, sessionExpiresAt, nowIso).run();
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(sessionId, workshop.id, email, userRole, sessionToken, sessionExpiresAt, nowIso).run();
 
         return json({
           success: true,

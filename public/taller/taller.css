@@ -916,17 +916,61 @@ html[data-ui="pro"] .stock-card:hover {
 @media (max-width: 980px) {
   html[data-ui="pro"] .order-card-enhanced {
     flex-wrap: wrap;
+    padding: 12px 14px !important;
+    gap: 10px !important;
+  }
+  html[data-ui="pro"] .order-card-enhanced .order-meta {
+    flex: 1 1 140px !important;
+  }
+  html[data-ui="pro"] .order-client-pro {
+    min-width: 0 !important;
+    flex: 1 1 auto;
+  }
+  html[data-ui="pro"] .order-actions-btns {
+    margin-left: auto;
+    width: auto !important;
+    border-top: none !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
   }
   html[data-ui="pro"] .order-stepper-wrap {
     width: 100%;
-    align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
   }
   .order-stepper {
-    flex-wrap: wrap;
-    border-radius: 12px;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-radius: 999px;
     width: 100%;
     justify-content: space-between;
+    padding: 3px 6px;
+    box-sizing: border-box;
+  }
+  .order-stepper::-webkit-scrollbar {
+    display: none;
+  }
+  .order-stepper .step-pill {
+    font-size: 10px;
+    padding: 3px 7px;
+    flex-shrink: 0;
+  }
+  .order-stepper .step-arrow {
+    font-size: 8px;
+    flex-shrink: 0;
+  }
+  .order-stepper-right {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
   }
 }
 

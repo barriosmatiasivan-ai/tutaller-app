@@ -328,11 +328,14 @@ function renderHome() {
 
   if (ongoing.length === 0) {
     homeContainer.innerHTML = `
-      <div class="empty" style="padding:28px 16px;text-align:center;">
-        <div style="font-size:36px;margin-bottom:8px;">🚀</div>
+      <div class="empty" style="padding:32px 16px;text-align:center;">
+        <div class="icon-classic" style="font-size:36px;margin-bottom:8px;">🚀</div>
+        <div class="icon-pro empty-pro-badge" style="margin:0 auto 14px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </div>
         <h3 style="margin-bottom:6px;">¡Tu taller está listo para arrancar!</h3>
-        <p class="muted" style="max-width:420px;margin:0 auto 16px;font-size:13px;line-height:1.4;">
-          Ingresá el primer equipo que entra a tu taller para registrar la falla, emitir el comprobante y generar el enlace de seguimiento con QR.
+        <p class="muted" style="max-width:440px;margin:0 auto 18px;font-size:13.5px;line-height:1.45;">
+          Ingresá el primer equipo que entra a tu taller para registrar la falla, emitir el comprobante y activar la línea de progreso en tiempo real con QR.
         </p>
         <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
           <button type="button" class="primary" id="btn-home-first-order">＋ Ingresar primer equipo</button>
@@ -371,7 +374,10 @@ function renderOrders() {
   if (list.length === 0) {
     container.innerHTML = `
       <div class="empty">
-        <span>▯</span>
+        <span class="icon-classic">▯</span>
+        <div class="icon-pro empty-pro-badge" style="margin:0 auto 12px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        </div>
         <h3>No se encontraron reparaciones</h3>
         <p>Probá con otro término de búsqueda o cambiá el filtro de estado.</p>
       </div>
@@ -383,6 +389,64 @@ function renderOrders() {
   bindOrderCardClicks(container);
 }
 
+function clientInitials(name) {
+  const clean = String(name || 'Cliente').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return clean.slice(0, 2).toUpperCase();
+}
+
+function renderOrderStepper(status) {
+  if (status === 'cancelled') {
+    return `
+      <div class="order-stepper">
+        <span class="step-pill step-cancelled">✕ Cancelado</span>
+      </div>
+    `;
+  }
+
+  let s1Class = 'upcoming';
+  let s2Class = 'upcoming';
+  let s3Class = 'upcoming';
+  let s1Icon = '1.';
+  let s2Label = 'En Reparación';
+  let s3Label = status === 'delivered' ? 'Entregado' : 'Listo para Retiro';
+
+  if (status === 'received') {
+    s1Class = 'active-cyan';
+    s1Icon = '<span class="step-dot"></span>';
+  } else if (status === 'in_progress') {
+    s1Class = 'done';
+    s1Icon = '✓';
+    s2Class = 'active-cyan';
+  } else if (status === 'waiting_parts') {
+    s1Class = 'done';
+    s1Icon = '✓';
+    s2Class = 'active-amber';
+    s2Label = 'Esp. Repuesto';
+  } else if (status === 'ready' || status === 'delivered') {
+    s1Class = 'done';
+    s1Icon = '✓';
+    s2Class = 'done';
+    s3Class = 'active-emerald';
+  }
+
+  const s2Prefix = s2Class === 'done' ? '✓ ' : (s2Class.startsWith('active') ? '<span class="step-dot"></span>' : '2. ');
+  const s3Prefix = s3Class === 'active-emerald' ? '✓ ' : '3. ';
+
+  return `
+    <div class="order-stepper" aria-label="Progreso de reparación">
+      <span class="step-pill ${s1Class}">${s1Icon} Diagnóstico</span>
+      <span class="step-arrow">➔</span>
+      <span class="step-pill ${s2Class}">${s2Prefix}${s2Label}</span>
+      <span class="step-arrow">➔</span>
+      <span class="step-pill ${s3Class}">${s3Prefix}${s3Label}</span>
+    </div>
+  `;
+}
+
 function orderCardHtml(order) {
   const st = STATUS_CONFIG[order.status] || { label: order.status, class: 'repairing' };
   const clientName = order.client_name || 'Cliente sin asignar';
@@ -390,21 +454,37 @@ function orderCardHtml(order) {
   const trackingUrl = `/seguimiento/${order.intake_key || order.id}`;
   const total = Number(order.total_cost || 0);
   const saldo = Number(order.balance_cents || 0) / 100;
+  const initials = clientInitials(clientName);
+  const financeBadgeHtml = saldo > 0
+    ? `<span class="order-finance-badge has-debt">Saldo: ${formatMoney(saldo)}</span>`
+    : (total > 0 ? `<span class="order-finance-badge paid">✓ Pagado</span>` : '');
 
   return `
     <div class="order-card-enhanced" data-order-id="${order.id}">
+      <span class="order-id-pro icon-pro">#${order.order_number}</span>
       ${brandBadge(order.brand)}
       <div class="order-meta">
-        <strong>
+        <strong class="icon-classic">
           <span class="muted small">#${order.order_number}</span>
           <span>${esc(clientName)}${clientPhone}</span>
         </strong>
         <span class="device-text">${esc(order.brand)} ${esc(order.model)}</span>
         <span class="fault-text">${esc(order.fault || 'Revisión técnica')}</span>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
+      <div class="order-client-pro icon-pro">
+        <span class="client-avatar-pro">${esc(initials)}</span>
+        <div class="client-info-pro">
+          <strong>${esc(clientName)}</strong>
+          <span>${esc(order.client_phone || 'Sin teléfono')}</span>
+        </div>
+      </div>
+      <div class="order-stepper-wrap icon-pro">
+        ${renderOrderStepper(order.status)}
+        ${financeBadgeHtml}
+      </div>
+      <div class="icon-classic" style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
         <span class="badge ${st.class}"><span class="dot"></span>${st.label}</span>
-        ${saldo > 0 ? `<span class="order-finance-badge has-debt">Saldo: ${formatMoney(saldo)}</span>` : (total > 0 ? `<span class="order-finance-badge paid">✓ Pagado</span>` : '')}
+        ${financeBadgeHtml}
       </div>
       <div class="order-actions-btns" onclick="event.stopPropagation();">
         ${order.client_phone ? `
@@ -516,7 +596,10 @@ function renderClients() {
   if (list.length === 0) {
     container.innerHTML = `
       <div class="empty">
-        <span>👥</span>
+        <span class="icon-classic">👥</span>
+        <div class="icon-pro empty-pro-badge" style="margin:0 auto 12px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
         <h3>Sin clientes cargados</h3>
         <p>Agregá tu primer cliente con el botón de arriba.</p>
       </div>
@@ -526,7 +609,7 @@ function renderClients() {
 
   container.innerHTML = list.map(c => `
     <div class="client-row">
-      <div class="avatar">${esc(c.name.slice(0, 1).toUpperCase())}</div>
+      <div class="avatar">${esc(clientInitials(c.name))}</div>
       <div>
         <strong>${esc(c.name)}</strong>
         <p class="muted">${esc(c.phone || 'Sin teléfono')}${c.email ? ` · ${esc(c.email)}` : ''}</p>
@@ -547,7 +630,10 @@ function renderStock() {
   if (items.length === 0) {
     container.innerHTML = `
       <div class="empty">
-        <span>📦</span>
+        <span class="icon-classic">📦</span>
+        <div class="icon-pro empty-pro-badge" style="margin:0 auto 12px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+        </div>
         <h3>Inventario vacío</h3>
         <p>Cargá pantallas, baterías, pines de carga y accesorios para controlar tu stock.</p>
       </div>

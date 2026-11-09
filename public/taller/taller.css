@@ -687,4 +687,231 @@ html[data-ui="pro"] .pending-card small {
   }
 }
 
+/* ==========================================================================
+   PASO 3: LÍNEA DE PROGRESO VISUAL (STEPPER 3 PASOS), AVATARES Y ESTADOS VACÍOS
+   ========================================================================== */
+
+html[data-ui="pro"] .empty {
+  background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.08) 0%, rgba(255, 255, 255, 0.015) 70%) !important;
+  border: 1px dashed rgba(52, 211, 153, 0.25) !important;
+  border-radius: 16px !important;
+}
+
+html[data-ui="pro"] .empty-pro-badge {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #34d399;
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.25);
+}
+
+/* Tarjeta/Fila de Orden en Modo Pro (Inspirada en la tabla de la referencia visual) */
+html[data-ui="pro"] .order-card-enhanced {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 14px !important;
+  padding: 14px 18px !important;
+  margin-bottom: 10px !important;
+  gap: 16px !important;
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.35);
+  transition: all 0.18s ease !important;
+}
+html[data-ui="pro"] .order-card-enhanced:hover {
+  background: rgba(255, 255, 255, 0.045) !important;
+  border-color: rgba(52, 211, 153, 0.4) !important;
+  box-shadow: 0 8px 26px -4px rgba(16, 185, 129, 0.2);
+  transform: translateY(-1px);
+}
+
+/* ID de orden estilo código (#1084) */
+html[data-ui="pro"] .order-id-pro {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 5px 9px;
+  border-radius: 8px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+html[data-ui="pro"] .order-card-enhanced .phone-icon {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border: 1px solid rgba(52, 211, 153, 0.28) !important;
+  border-radius: 11px !important;
+  color: #34d399 !important;
+}
+
+html[data-ui="pro"] .order-card-enhanced .order-meta .device-text {
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  letter-spacing: -0.01em;
+}
+html[data-ui="pro"] .order-card-enhanced .order-meta .fault-text {
+  font-size: 12.5px !important;
+  color: #94a3b8 !important;
+}
+
+/* Columna Cliente con Avatar Circular de Iniciales en Modo Pro */
+html[data-ui="pro"] .order-client-pro {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 175px;
+  flex-shrink: 0;
+}
+.client-avatar-pro,
+html[data-ui="pro"] .client-row .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.2) 100%) !important;
+  border: 1px solid rgba(52, 211, 153, 0.45) !important;
+  color: #6ee7b7 !important;
+  font-size: 12.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.2);
+}
+.client-info-pro {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+.client-info-pro strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.2;
+}
+.client-info-pro span {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+/* Contenedor de Línea de Progreso Visual (Stepper 3 Pasos) */
+html[data-ui="pro"] .order-stepper-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.order-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(9, 13, 11, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 4px 6px;
+  border-radius: 999px;
+}
+.step-arrow {
+  font-size: 10px;
+  color: #475569;
+  user-select: none;
+}
+.step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.step-pill .step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* Paso Completado (Done) */
+.step-pill.done {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+/* Paso Activo en Cian (Diagnóstico / En Reparación) */
+.step-pill.active-cyan {
+  background: rgba(6, 182, 212, 0.18);
+  color: #22d3ee;
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 14px rgba(6, 182, 212, 0.3);
+  font-weight: 700;
+}
+/* Paso Activo en Ámbar (Esperando Repuesto) */
+.step-pill.active-amber {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
+  font-weight: 700;
+}
+/* Paso Activo en Esmeralda (Listo para Retiro / Entregado) */
+.step-pill.active-emerald {
+  background: rgba(16, 185, 129, 0.22);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.65);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.38);
+  font-weight: 700;
+}
+/* Paso Pendiente (Upcoming) */
+.step-pill.upcoming {
+  background: transparent;
+  color: #64748b;
+  border: 1px solid transparent;
+}
+/* Cancelado */
+.step-pill.step-cancelled {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+/* Filas de Clientes y Stock en Modo Pro */
+html[data-ui="pro"] .client-row,
+html[data-ui="pro"] .stock-card {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  transition: all 0.15s ease;
+}
+html[data-ui="pro"] .client-row:hover,
+html[data-ui="pro"] .stock-card:hover {
+  background: rgba(255, 255, 255, 0.045) !important;
+  border-color: rgba(52, 211, 153, 0.35) !important;
+}
+
+@media (max-width: 980px) {
+  html[data-ui="pro"] .order-card-enhanced {
+    flex-wrap: wrap;
+  }
+  html[data-ui="pro"] .order-stepper-wrap {
+    width: 100%;
+    align-items: flex-start;
+    margin-top: 4px;
+  }
+  .order-stepper {
+    flex-wrap: wrap;
+    border-radius: 12px;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+
 

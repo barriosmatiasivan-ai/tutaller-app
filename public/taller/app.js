@@ -478,10 +478,6 @@ function orderCardHtml(order) {
           <span>${esc(order.client_phone || 'Sin teléfono')}</span>
         </div>
       </div>
-      <div class="order-stepper-wrap icon-pro">
-        ${renderOrderStepper(order.status)}
-        ${financeBadgeHtml}
-      </div>
       <div class="icon-classic" style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
         <span class="badge ${st.class}"><span class="dot"></span>${st.label}</span>
         ${financeBadgeHtml}
@@ -496,7 +492,13 @@ function orderCardHtml(order) {
           📲
         </a>
       </div>
-      <span class="chevron" style="margin-left:6px;">›</span>
+      <span class="chevron icon-classic" style="margin-left:6px;">›</span>
+      <div class="order-stepper-wrap icon-pro">
+        ${renderOrderStepper(order.status)}
+        <div class="order-stepper-right">
+          ${financeBadgeHtml}
+        </div>
+      </div>
     </div>
   `;
 }

@@ -712,9 +712,10 @@ html[data-ui="pro"] .order-card-enhanced {
   background: rgba(255, 255, 255, 0.025) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 14px !important;
-  padding: 14px 18px !important;
+  padding: 14px 16px !important;
   margin-bottom: 10px !important;
-  gap: 16px !important;
+  gap: 12px 14px !important;
+  flex-wrap: wrap !important;
   box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.35);
   transition: all 0.18s ease !important;
 }
@@ -728,12 +729,12 @@ html[data-ui="pro"] .order-card-enhanced:hover {
 /* ID de orden estilo código (#1084) */
 html[data-ui="pro"] .order-id-pro {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #94a3b8;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 5px 9px;
+  padding: 5px 8px;
   border-radius: 8px;
   letter-spacing: 0.02em;
   flex-shrink: 0;
@@ -746,6 +747,10 @@ html[data-ui="pro"] .order-card-enhanced .phone-icon {
   color: #34d399 !important;
 }
 
+html[data-ui="pro"] .order-card-enhanced .order-meta {
+  min-width: 150px !important;
+  flex: 1 1 160px !important;
+}
 html[data-ui="pro"] .order-card-enhanced .order-meta .device-text {
   font-size: 14.5px !important;
   font-weight: 700 !important;
@@ -762,18 +767,18 @@ html[data-ui="pro"] .order-client-pro {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-width: 175px;
+  min-width: 155px;
   flex-shrink: 0;
 }
 .client-avatar-pro,
 html[data-ui="pro"] .client-row .avatar {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.2) 100%) !important;
   border: 1px solid rgba(52, 211, 153, 0.45) !important;
   color: #6ee7b7 !important;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
@@ -788,32 +793,43 @@ html[data-ui="pro"] .client-row .avatar {
   text-align: left;
 }
 .client-info-pro strong {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: #f1f5f9;
   line-height: 1.2;
 }
 .client-info-pro span {
-  font-size: 11.5px;
+  font-size: 11px;
   color: #64748b;
 }
 
-/* Contenedor de Línea de Progreso Visual (Stepper 3 Pasos) */
+/* Contenedor de Línea de Progreso Visual (Stepper 3 Pasos) en barra inferior de la tarjeta */
 html[data-ui="pro"] .order-stepper-wrap {
+  width: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  flex-shrink: 0;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+.order-stepper-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .order-stepper {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(9, 13, 11, 0.65);
+  background: rgba(9, 13, 11, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.07);
   padding: 4px 6px;
   border-radius: 999px;
+  flex-wrap: wrap;
 }
 .step-arrow {
   font-size: 10px;

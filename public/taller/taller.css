@@ -741,10 +741,11 @@ html[data-ui="pro"] .order-id-pro {
 }
 
 html[data-ui="pro"] .order-card-enhanced .phone-icon {
-  background: rgba(16, 185, 129, 0.1) !important;
-  border: 1px solid rgba(52, 211, 153, 0.28) !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
   border-radius: 11px !important;
-  color: #34d399 !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 html[data-ui="pro"] .order-card-enhanced .order-meta {

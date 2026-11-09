@@ -49,6 +49,40 @@
     .status-progress { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
     .status-parts { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
     .status-delivered { background: rgba(107, 114, 128, 0.2); color: #9ca3af; border: 1px solid #6b7280; }
+
+    /* Línea de Progreso Visual de 3 Pasos */
+    .order-stepper {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(9, 13, 11, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin: 12px 0 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .step-arrow { font-size: 10px; color: #64748b; user-select: none; }
+    .step-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .step-pill .step-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor;
+    }
+    .step-pill.done { background: rgba(16, 185, 129, 0.14); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.35); }
+    .step-pill.active-cyan { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(34, 211, 238, 0.6); box-shadow: 0 0 14px rgba(6, 182, 212, 0.35); font-weight: 700; }
+    .step-pill.active-amber { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.6); box-shadow: 0 0 14px rgba(245, 158, 11, 0.35); font-weight: 700; }
+    .step-pill.active-emerald { background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.7); box-shadow: 0 0 16px rgba(16, 185, 129, 0.4); font-weight: 700; }
+    .step-pill.upcoming { background: transparent; color: #64748b; border: 1px solid transparent; }
+
     .device-title {
       font-size: 22px;
       font-weight: 800;
@@ -143,6 +177,34 @@
         else if (o.status === 'delivered') { statusClass = 'status-delivered'; statusText = 'Entregado al cliente'; }
         else if (o.status === 'received') { statusClass = 'status-progress'; statusText = 'Ingresado al taller'; }
 
+        function renderStepper(status) {
+          if (status === 'cancelled') {
+            return '<div class="order-stepper"><span class="step-pill" style="color:#f87171;background:rgba(239,68,68,0.15);">✕ Cancelado</span></div>';
+          }
+          let s1 = 'upcoming', s2 = 'upcoming', s3 = 'upcoming';
+          let s1Icon = '1.', s2Label = 'En Reparación', s3Label = status === 'delivered' ? 'Entregado' : 'Listo para Retiro';
+          if (status === 'received') {
+            s1 = 'active-cyan'; s1Icon = '<span class="step-dot"></span>';
+          } else if (status === 'in_progress') {
+            s1 = 'done'; s1Icon = '✓'; s2 = 'active-cyan';
+          } else if (status === 'waiting_parts') {
+            s1 = 'done'; s1Icon = '✓'; s2 = 'active-amber'; s2Label = 'Esp. Repuesto';
+          } else if (status === 'ready' || status === 'delivered') {
+            s1 = 'done'; s1Icon = '✓'; s2 = 'done'; s3 = 'active-emerald';
+          }
+          const s2Pre = s2 === 'done' ? '✓ ' : (s2.startsWith('active') ? '<span class="step-dot"></span>' : '2. ');
+          const s3Pre = s3 === 'active-emerald' ? '✓ ' : '3. ';
+          return `
+            <div class="order-stepper">
+              <span class="step-pill ${s1}">${s1Icon} Diagnóstico</span>
+              <span class="step-arrow">➔</span>
+              <span class="step-pill ${s2}">${s2Pre}${s2Label}</span>
+              <span class="step-arrow">➔</span>
+              <span class="step-pill ${s3}">${s3Pre}${s3Label}</span>
+            </div>
+          `;
+        }
+
         let cleanPhone = (w.phone || '').replace(/[^0-9]/g, '');
         let waLink = '';
         if (cleanPhone) {
@@ -155,6 +217,7 @@
             <span class="workshop-badge">${esc(w.name || 'Tu Taller')}</span>
             <div class="device-title">${esc(o.brand)} ${esc(o.model)}</div>
             <p style="color:var(--text-muted);font-size:13px;margin-top:4px;">Orden N° <strong>#${o.order_number}</strong></p>
+            ${renderStepper(o.status)}
             <div><span class="status-pill ${statusClass}">${statusText}</span></div>
           </div>
 

@@ -371,3 +371,155 @@ dialog.custom-dialog::backdrop {
     padding-top: 8px;
   }
 }
+
+/* ==========================================================================
+   PASO 1: CONMUTADOR DE INTERFAZ (CLÁSICA VS PRO), TIPOGRAFÍA & NAVEGACIÓN SVG
+   ========================================================================== */
+
+/* En Modo Clásico: mostrar emojis, ocultar iconos SVG Pro */
+.icon-pro {
+  display: none;
+}
+.icon-classic {
+  display: inline-block;
+}
+
+/* En Modo Pro: ocultar emojis, mostrar iconos SVG Pro */
+html[data-ui="pro"] .icon-classic {
+  display: none !important;
+}
+html[data-ui="pro"] .icon-pro {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Botón Conmutador de Interfaz en la cabecera */
+.ui-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  min-height: 36px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: #34d399;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.ui-switch-btn:hover {
+  background: rgba(16, 185, 129, 0.22);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+html[data-ui="pro"] .ui-switch-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #051b11;
+  border-color: #34d399;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.45);
+}
+
+/* Tipografía y Superficie Base en Modo Pro */
+html[data-ui="pro"] body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #090d0b !important;
+  color: #f0f7f4 !important;
+  letter-spacing: -0.011em;
+}
+
+/* Barra Lateral (Sidebar) en Modo Pro */
+html[data-ui="pro"] .sidebar {
+  background: #0c120f !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
+}
+html[data-ui="pro"] .sidebar-brand-box {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+html[data-ui="pro"] .sidebar nav .nav-item {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #8fa69a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+html[data-ui="pro"] .sidebar nav .nav-item:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #ffffff !important;
+}
+html[data-ui="pro"] .sidebar nav .nav-item.active {
+  background: rgba(16, 185, 129, 0.14) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  box-shadow: 0 4px 16px -4px rgba(16, 185, 129, 0.25) !important;
+  font-weight: 600;
+}
+html[data-ui="pro"] .sidebar nav .nav-item.active .icon-pro {
+  color: #10b981;
+  filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.5));
+}
+
+/* Cabecera Superior (Topbar) Glassmorphic en Modo Pro */
+html[data-ui="pro"] .topbar {
+  background: rgba(12, 18, 15, 0.82) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+html[data-ui="pro"] .search {
+  background: rgba(255, 255, 255, 0.035) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 10px !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+html[data-ui="pro"] .search:focus-within {
+  border-color: rgba(16, 185, 129, 0.6) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 0 18px rgba(16, 185, 129, 0.2) !important;
+}
+
+/* Títulos de sección y botones principales en Modo Pro */
+html[data-ui="pro"] .page-heading h1 {
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+html[data-ui="pro"] button.primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #041f14 !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(52, 211, 153, 0.4) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 18px -2px rgba(16, 185, 129, 0.35) !important;
+  transition: all 0.15s ease;
+}
+html[data-ui="pro"] button.primary:hover {
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.5) !important;
+  transform: translateY(-1px);
+}
+
+/* Barra inferior móvil en Modo Pro */
+html[data-ui="pro"] .bottom-nav {
+  background: rgba(12, 18, 15, 0.92) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+html[data-ui="pro"] .bottom-nav .nav-item.active {
+  color: #34d399 !important;
+  border-top-color: #10b981 !important;
+}
+

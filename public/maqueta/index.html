@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="es" data-style="linear" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Maqueta de Estilos Visuales · Tu Taller Soft</title>
+  <style>
+    /* RESET & BASE */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ==========================================================================
+       VARIABLES POR ESTILO Y TEMA
+       ========================================================================== */
+    
+    /* 1. ESTILO LINEAR TECH (OSCURO) */
+    html[data-style="linear"][data-theme="dark"] {
+      --bg-page: #0c100e;
+      --bg-sidebar: #0f1412;
+      --bg-surface: #141b17;
+      --bg-surface-hover: #1a241f;
+      --bg-card: #121815;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: #10b981;
+      --text-main: #f0fdf4;
+      --text-muted: #83978b;
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --primary-text: #062b1e;
+      --accent-glow: 0 0 20px -3px rgba(16, 185, 129, 0.25);
+      --badge-ready-bg: rgba(16, 185, 129, 0.12);
+      --badge-ready-text: #34d399;
+      --badge-ready-border: rgba(16, 185, 129, 0.3);
+      --badge-parts-bg: rgba(245, 158, 11, 0.12);
+      --badge-parts-text: #fbbf24;
+      --badge-parts-border: rgba(245, 158, 11, 0.3);
+      --badge-prog-bg: rgba(59, 130, 246, 0.12);
+      --badge-prog-text: #60a5fa;
+      --badge-prog-border: rgba(59, 130, 246, 0.3);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* 1. ESTILO LINEAR TECH (CLARO) */
+    html[data-style="linear"][data-theme="light"] {
+      --bg-page: #f4f7f5;
+      --bg-sidebar: #ffffff;
+      --bg-surface: #ffffff;
+      --bg-surface-hover: #f0f5f2;
+      --bg-card: #ffffff;
+      --border-subtle: #e2e8e4;
+      --border-focus: #059669;
+      --text-main: #13241b;
+      --text-muted: #647a6f;
+      --primary: #059669;
+      --primary-hover: #047857;
+      --primary-text: #ffffff;
+      --accent-glow: 0 4px 15px -2px rgba(5, 150, 105, 0.2);
+      --badge-ready-bg: #d1fae5;
+      --badge-ready-text: #065f46;
+      --badge-ready-border: #a7f3d0;
+      --badge-parts-bg: #fef3c7;
+      --badge-parts-text: #92400e;
+      --badge-parts-border: #fde68a;
+      --badge-prog-bg: #dbeafe;
+      --badge-prog-text: #1e40af;
+      --badge-prog-border: #bfdbfe;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* 2. ESTILO CLEAN STUDIO (CLARO / APPLE LOOK) */
+    html[data-style="studio"][data-theme="light"] {
+      --bg-page: #f8fafc;
+      --bg-sidebar: #ffffff;
+      --bg-surface: #ffffff;
+      --bg-surface-hover: #f1f5f9;
+      --bg-card: #ffffff;
+      --border-subtle: #e2e8f0;
+      --border-focus: #0f172a;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      --primary-text: #ffffff;
+      --accent-glow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+      --badge-ready-bg: #ecfdf5;
+      --badge-ready-text: #059669;
+      --badge-ready-border: #a7f3d0;
+      --badge-parts-bg: #fffbeb;
+      --badge-parts-text: #d97706;
+      --badge-parts-border: #fde68a;
+      --badge-prog-bg: #eff6ff;
+      --badge-prog-text: #2563eb;
+      --badge-prog-border: #bfdbfe;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-mono: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* 2. ESTILO CLEAN STUDIO (OSCURO / SLATE LUXE) */
+    html[data-style="studio"][data-theme="dark"] {
+      --bg-page: #0f172a;
+      --bg-sidebar: #1e293b;
+      --bg-surface: #1e293b;
+      --bg-surface-hover: #293548;
+      --bg-card: #182234;
+      --border-subtle: #334155;
+      --border-focus: #38bdf8;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --primary-text: #082f49;
+      --accent-glow: 0 8px 30px -4px rgba(56, 189, 248, 0.25);
+      --badge-ready-bg: rgba(52, 211, 153, 0.15);
+      --badge-ready-text: #34d399;
+      --badge-ready-border: rgba(52, 211, 153, 0.3);
+      --badge-parts-bg: rgba(251, 191, 36, 0.15);
+      --badge-parts-text: #fbbf24;
+      --badge-parts-border: rgba(251, 191, 36, 0.3);
+      --badge-prog-bg: rgba(96, 165, 250, 0.15);
+      --badge-prog-text: #60a5fa;
+      --badge-prog-border: rgba(96, 165, 250, 0.3);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-mono: ui-monospace, sans-serif;
+    }
+
+    /* 3. ESTILO OBSIDIAN CYBER (NEON & PILL TECH) */
+    html[data-style="cyber"][data-theme="dark"] {
+      --bg-page: #050706;
+      --bg-sidebar: #080d0a;
+      --bg-surface: #0c130f;
+      --bg-surface-hover: #121c16;
+      --bg-card: #0a100c;
+      --border-subtle: #19271f;
+      --border-focus: #00ff88;
+      --text-main: #ffffff;
+      --text-muted: #6b8274;
+      --primary: #00ff88;
+      --primary-hover: #00d974;
+      --primary-text: #022011;
+      --accent-glow: 0 0 25px rgba(0, 255, 136, 0.35);
+      --badge-ready-bg: rgba(0, 255, 136, 0.1);
+      --badge-ready-text: #00ff88;
+      --badge-ready-border: rgba(0, 255, 136, 0.4);
+      --badge-parts-bg: rgba(255, 184, 0, 0.1);
+      --badge-parts-text: #ffb800;
+      --badge-parts-border: rgba(255, 184, 0, 0.4);
+      --badge-prog-bg: rgba(0, 204, 255, 0.1);
+      --badge-prog-text: #00ccff;
+      --badge-prog-border: rgba(0, 204, 255, 0.4);
+      --radius-sm: 999px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --font-mono: ui-monospace, "JetBrains Mono", Menlo, monospace;
+    }
+
+    /* BARRA SUPERIOR DE CONTROL DE MAQUETA (INTERACTIVA) */
+    .style-picker-bar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      color: #fff;
+      font-size: 13px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    }
+    .style-picker-bar .title {
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      letter-spacing: -0.2px;
+    }
+    .style-picker-bar .title span {
+      background: #10b981;
+      color: #062b1e;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .segmented-control {
+      display: inline-flex;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .segmented-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .segmented-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .segmented-btn.active {
+      background: #10b981;
+      color: #062b1e;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+    .theme-toggle-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f1f5f9;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+    }
+    .theme-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* CONTENEDOR PRINCIPAL DE LA APP */
+    .app-viewport {
+      flex: 1;
+      background: var(--bg-page);
+      color: var(--text-main);
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: calc(100vh - 54px);
+    }
+    @media (max-width: 900px) {
+      .app-viewport {
+        grid-template-columns: 1fr;
+      }
+      .app-sidebar {
+        display: none !important;
+      }
+    }
+
+    /* SIDEBAR */
+    .app-sidebar {
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-subtle);
+      padding: 20px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .brand-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 8px;
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      display: grid;
+      place-items: center;
+      color: var(--primary);
+    }
+    .brand-info h3 {
+      font-size: 14.5px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .brand-info p {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+    .sidebar-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      list-style: none;
+    }
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    .menu-item svg {
+      width: 17px;
+      height: 17px;
+      stroke-width: 2px;
+    }
+    .menu-item:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+    }
+    .menu-item.active {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      font-weight: 600;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .menu-item.active svg {
+      color: var(--primary);
+    }
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+    .plan-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* MAIN CONTENT */
+    .app-main {
+      padding: 24px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 1300px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    @media (max-width: 700px) {
+      .app-main {
+        padding: 16px;
+      }
+    }
+
+    /* TOP HEADER & SEARCH */
+    .main-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .search-input-box {
+      position: relative;
+      flex: 1;
+      min-width: 240px;
+      max-width: 480px;
+    }
+    .search-input-box svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+    }
+    .search-input-box input {
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 9px 12px 9px 38px;
+      font-size: 13px;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .search-input-box input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-action {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.15s ease;
+    }
+    .btn-action:hover {
+      background: var(--bg-surface-hover);
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: var(--primary-text);
+      border: 1px solid transparent;
+      padding: 9px 18px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--accent-glow);
+      transition: all 0.15s ease;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    /* KPI METRICS GRID */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+    @media (max-width: 1024px) {
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (max-width: 500px) {
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .kpi-card:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+      transform: translateY(-2px);
+    }
+    .kpi-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .kpi-icon-wrap {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      display: grid;
+      place-items: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+    }
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      line-height: 1;
+    }
+    .kpi-footer {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .kpi-footer strong {
+      color: var(--primary);
+    }
+
+    /* SECTION TABS & CONTROLS */
+    .panel-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    }
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .panel-header h2 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .filter-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-surface);
+      padding: 3px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: calc(var(--radius-sm) - 2px);
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    /* REPAIRS DATA TABLE */
+    .orders-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+    .orders-table th {
+      padding: 12px 18px;
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .orders-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: middle;
+    }
+    .orders-table tr:hover td {
+      background: var(--bg-surface-hover);
+    }
+    .order-id {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 12.5px;
+      color: var(--primary);
+    }
+    .device-title {
+      font-weight: 700;
+      font-size: 13.5px;
+      color: var(--text-main);
+    }
+    .device-fault {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .client-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .client-name {
+      font-weight: 600;
+    }
+    .client-phone {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 11.5px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .status-badge.ready {
+      background: var(--badge-ready-bg);
+      color: var(--badge-ready-text);
+      border: 1px solid var(--badge-ready-border);
+    }
+    .status-badge.parts {
+      background: var(--badge-parts-bg);
+      color: var(--badge-parts-text);
+      border: 1px solid var(--badge-parts-border);
+    }
+    .status-badge.in_progress {
+      background: var(--badge-prog-bg);
+      color: var(--badge-prog-text);
+      border: 1px solid var(--badge-prog-border);
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .cost-text {
+      font-weight: 700;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+    }
+
+    /* BOTONES DE TABLA */
+    .row-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .btn-icon:hover {
+      color: var(--text-main);
+      border-color: var(--border-focus);
+    }
+
+    /* BANNER DE NOTIFICACIÓN DE ESTILO */
+    .style-note-banner {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-size: 13px;
+    }
+    .style-note-banner strong {
+      color: var(--primary);
+    }
+
+    /* MÓVIL BOTTOM BAR */
+    .mobile-nav-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--bg-sidebar);
+      border-top: 1px solid var(--border-subtle);
+      padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+      justify-content: space-around;
+      z-index: 999;
+    }
+    @media (max-width: 900px) {
+      .mobile-nav-bar {
+        display: flex;
+      }
+    }
+    .mobile-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-decoration: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+    .mobile-nav-item.active {
+      color: var(--primary);
+    }
+    .mobile-nav-item svg {
+      width: 20px;
+      height: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================================================
+       BARRA FLOTANTE INTERACTIVA: CAMBIADOR DE ESTILOS Y TEMAS
+       ========================================================================= -->
+  <header class="style-picker-bar">
+    <div class="title">
+      🎨 Maqueta de Estilos <span>En Vivo</span>
+    </div>
+
+    <div class="controls-group">
+      <!-- Selector de Estilo -->
+      <div class="segmented-control" id="style-selector">
+        <button class="segmented-btn active" data-set-style="linear">
+          ⚡ Linear Pro
+        </button>
+        <button class="segmented-btn" data-set-style="studio">
+          ☀️ Clean Studio
+        </button>
+        <button class="segmented-btn" data-set-style="cyber">
+          🪐 Obsidian Cyber
+        </button>
+      </div>
+
+      <!-- Toggle Claro / Oscuro -->
+      <button class="theme-toggle-btn" id="btn-toggle-theme" title="Cambiar Claro / Oscuro">
+        <span id="theme-icon">🌙</span> <span id="theme-label">Modo Oscuro</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       VISTA DEL TALLER CON EL ESTILO APLICADO
+       ========================================================================= -->
+  <div class="app-viewport">
+    
+    <!-- SIDEBAR -->
+    <aside class="app-sidebar">
+      <div class="brand-header">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
+            <path d="M12 18h.01"/>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <h3>O.G serviCell</h3>
+          <p>Taller Técnico Especializado</p>
+        </div>
+      </div>
+
+      <ul class="sidebar-menu">
+        <li>
+          <a class="menu-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Inicio
+          </a>
+        </li>
+        <li>
+          <a class="menu-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            Reparaciones
+          </a>
+        </li>
+        <li>
+          <a class="menu-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Clientes
+          </a>
+        </li>
+        <li>
+          <a class="menu-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+            Stock
+          </a>
+        </li>
+        <li>
+          <a class="menu-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+            Caja
+          </a>
+        </li>
+        <li>
+          <a class="menu-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            Configuración
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="plan-pill">
+          <span>Plan Pro ⭐</span>
+          <span style="color:var(--primary); font-size:11px;">Vitalicio 👑</span>
+        </div>
+        <div>
+          <span>🇦🇷 AR · Mercado Pago & Efectivo</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ÁREA DE CONTENIDO -->
+    <main class="app-main">
+      
+      <!-- EXPLICACIÓN DINÁMICA DEL ESTILO SELECCIONADO -->
+      <div class="style-note-banner">
+        <div>
+          <span id="style-badge-desc">Estilo Activo:</span> <strong id="style-name-desc">Linear Pro (Técnico / Silicon Valley)</strong>
+          <p id="style-sub-desc" style="margin-top:2px; font-size:12px; color:var(--text-muted);">
+            Grafito mate con bordes finos de precisión, micro-iluminación esmeralda e íconos geométricos limpios.
+          </p>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); text-align:right;">
+          Probá cambiar arriba entre <strong>Linear</strong>, <strong>Studio</strong> y <strong>Cyber</strong>
+        </div>
+      </div>
+
+      <!-- TOPBAR & ACCIONES -->
+      <header class="main-topbar">
+        <div class="search-input-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" placeholder="Buscar por cliente, orden #1082 o IMEI...">
+        </div>
+
+        <div class="header-actions">
+          <button class="btn-action">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            Nuevo Cliente
+          </button>
+          <button class="btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Ingresar Equipo
+          </button>
+        </div>
+      </header>
+
+      <!-- TARJETAS DE MÉTRICAS (KPIs) -->
+      <section class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-head">
+            <span>En Reparación</span>
+            <div class="kpi-icon-wrap" style="color:#60a5fa;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            </div>
+          </div>
+          <div class="kpi-value">8</div>
+          <div class="kpi-footer">
+            <strong>2 para hoy</strong> · 6 en diagnóstico
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-head">
+            <span>Listos para Retiro</span>
+            <div class="kpi-icon-wrap" style="color:var(--primary);">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+          </div>
+          <div class="kpi-value">3</div>
+          <div class="kpi-footer">
+            WhatsApp enviado automáticamente
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-head">
+            <span>Esperando Repuesto</span>
+            <div class="kpi-icon-wrap" style="color:#fbbf24;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+          </div>
+          <div class="kpi-value">2</div>
+          <div class="kpi-footer">
+            Módulo Samsung & Batería Moto
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-head">
+            <span>Caja del Día</span>
+            <div class="kpi-icon-wrap" style="color:var(--primary);">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+            </div>
+          </div>
+          <div class="kpi-value">$ 142.500</div>
+          <div class="kpi-footer">
+            <strong>70%</strong> Mercado Pago · 30% Efvo
+          </div>
+        </div>
+      </section>
+
+      <!-- TABLA DE ÓRDENES ACTIVAS -->
+      <section class="panel-card">
+        <div class="panel-header">
+          <h2>Órdenes en Taller (Reparaciones Activas)</h2>
+          <div class="filter-tabs">
+            <button class="tab-btn active">Todas (13)</button>
+            <button class="tab-btn">En Proceso (8)</button>
+            <button class="tab-btn">Listos (3)</button>
+            <button class="tab-btn">Repuestos (2)</button>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="orders-table">
+            <thead>
+              <tr>
+                <th>Orden</th>
+                <th>Equipo / Falla</th>
+                <th>Cliente</th>
+                <th>Estado</th>
+                <th>Presupuesto</th>
+                <th style="text-align:right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="order-id">#1084</span></td>
+                <td>
+                  <div class="device-title">iPhone 13 Pro 128GB</div>
+                  <div class="device-fault">Pantalla rota sin imagen · Requiere OLED original</div>
+                </td>
+                <td>
+                  <div class="client-cell">
+                    <span class="client-name">Martín Silva</span>
+                    <span class="client-phone">+54 9 11 4099-2231</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="status-badge ready">
+                    <span class="status-dot"></span> Listo para retirar
+                  </span>
+                </td>
+                <td><span class="cost-text">$ 95.000</span></td>
+                <td style="text-align:right;">
+                  <div class="row-actions">
+                    <button class="btn-icon" title="Enviar WhatsApp con link de seguimiento">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </button>
+                    <button class="btn-icon" title="Ver ficha completa">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td><span class="order-id">#1083</span></td>
+                <td>
+                  <div class="device-title">Samsung Galaxy S23 Ultra</div>
+                  <div class="device-fault">No carga · Pin de carga Tipo-C sulfatado</div>
+                </td>
+                <td>
+                  <div class="client-cell">
+                    <span class="client-name">Valeria Rossi</span>
+                    <span class="client-phone">+54 9 11 5566-7788</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="status-badge in_progress">
+                    <span class="status-dot"></span> En reparación
+                  </span>
+                </td>
+                <td><span class="cost-text">$ 38.000</span></td>
+                <td style="text-align:right;">
+                  <div class="row-actions">
+                    <button class="btn-icon" title="Enviar WhatsApp con link de seguimiento">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </button>
+                    <button class="btn-icon" title="Ver ficha completa">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td><span class="order-id">#1082</span></td>
+                <td>
+                  <div class="device-title">Motorola Edge 40 Neo</div>
+                  <div class="device-fault">Apagado súbito tras caída · Diagnóstico en placa</div>
+                </td>
+                <td>
+                  <div class="client-cell">
+                    <span class="client-name">Carlos Benítez</span>
+                    <span class="client-phone">+54 9 11 9988-1122</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="status-badge parts">
+                    <span class="status-dot"></span> Esperando repuesto
+                  </span>
+                </td>
+                <td><span class="cost-text">$ 45.000</span></td>
+                <td style="text-align:right;">
+                  <div class="row-actions">
+                    <button class="btn-icon" title="Enviar WhatsApp con link de seguimiento">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </button>
+                    <button class="btn-icon" title="Ver ficha completa">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- NAVEGACIÓN MÓVIL INFERIOR -->
+  <nav class="mobile-nav-bar">
+    <button class="mobile-nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Inicio
+    </button>
+    <button class="mobile-nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      Órdenes
+    </button>
+    <button class="mobile-nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Clientes
+    </button>
+    <button class="mobile-nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="12" x="2" y="6" rx="2"/></svg>
+      Caja
+    </button>
+  </nav>
+
+  <!-- LÓGICA INTERACTIVA DEL SELECTOR -->
+  <script>
+    const descriptions = {
+      linear: {
+        title: "Linear Pro (Técnico / Silicon Valley)",
+        sub: "Grafito mate (#0c100e) con bordes milimétricos, acentos esmeralda sutiles e íconos vectoriales geométricos."
+      },
+      studio: {
+        title: "Clean Studio (Apple / Stripe Enterprise)",
+        sub: "Espacios generosos, sombras suaves difusas, esquinas redondeadas y contraste óptico para alta legibilidad."
+      },
+      cyber: {
+        title: "Obsidian Cyber (High-Tech / Raycast Look)",
+        sub: "Fondo negro absoluto (#050706), micro-brillo neón esmeralda (#00ff88), tipografía mono y píldoras futuristas."
+      }
+    };
+
+    const styleButtons = document.querySelectorAll('#style-selector button');
+    const themeBtn = document.querySelector('#btn-toggle-theme');
+    const themeIcon = document.querySelector('#theme-icon');
+    const themeLabel = document.querySelector('#theme-label');
+    const nameDesc = document.querySelector('#style-name-desc');
+    const subDesc = document.querySelector('#style-sub-desc');
+
+    // Cambiar Estilo
+    styleButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        styleButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const style = btn.getAttribute('data-set-style');
+        document.documentElement.setAttribute('data-style', style);
+        
+        nameDesc.textContent = descriptions[style].title;
+        subDesc.textContent = descriptions[style].sub;
+      });
+    });
+
+    // Cambiar Modo Claro / Oscuro
+    themeBtn.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+
+      if (newTheme === 'dark') {
+        themeIcon.textContent = '🌙';
+        themeLabel.textContent = 'Modo Oscuro';
+      } else {
+        themeIcon.textContent = '☀️';
+        themeLabel.textContent = 'Modo Claro';
+      }
+    });
+  </script>
+</body>
+</html>

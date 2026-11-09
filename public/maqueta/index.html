@@ -169,6 +169,37 @@
       --font-mono: ui-monospace, "JetBrains Mono", Menlo, monospace;
     }
 
+    
+    /* 4. ESTILO DASH SERVICE (LIGHT ENTERPRISE SAAS - REFERENCIA IMAGE.PNG) */
+    html[data-style="dash"] {
+      --bg-page: #f8fafc;
+      --bg-sidebar: #ffffff;
+      --bg-surface: #ffffff;
+      --bg-surface-hover: #f1f5f9;
+      --bg-card: #ffffff;
+      --border-subtle: #e2e8f0;
+      --border-focus: #00b87c;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --primary: #00b87c;
+      --primary-hover: #009966;
+      --primary-text: #ffffff;
+      --accent-glow: 0 2px 10px rgba(0, 184, 124, 0.18);
+      --badge-ready-bg: #dcfce7;
+      --badge-ready-text: #15803d;
+      --badge-ready-border: #bbf7d0;
+      --badge-parts-bg: #f3e8ff;
+      --badge-parts-text: #7e22ce;
+      --badge-parts-border: #e9d5ff;
+      --badge-prog-bg: #ffedd5;
+      --badge-prog-text: #c2410c;
+      --badge-prog-border: #fed7aa;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 12px;
+      --font-mono: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
     /* BARRA SUPERIOR DE CONTROL DE MAQUETA (INTERACTIVA) */
     .style-picker-bar {
       position: sticky;
@@ -808,6 +839,376 @@
       width: 20px;
       height: 20px;
     }
+  
+    /* ==========================================================================
+       ESPECÍFICOS DEL ESTILO DASH SERVICE (IMAGE.PNG)
+       ========================================================================== */
+    html[data-style="dash"] body {
+      background: #f8fafc !important;
+      color: #1e293b !important;
+    }
+    html[data-style="dash"] .app-sidebar {
+      background: #ffffff !important;
+      border-right: 1px solid #e2e8f0 !important;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.02) !important;
+    }
+    html[data-style="dash"] .brand-header {
+      border-bottom: 1px solid #f1f5f9 !important;
+      padding-bottom: 16px !important;
+    }
+    html[data-style="dash"] .brand-info h3 {
+      color: #0f172a !important;
+      font-weight: 800 !important;
+      font-size: 17px !important;
+      letter-spacing: -0.3px !important;
+    }
+    html[data-style="dash"] .brand-info p {
+      color: #00b87c !important;
+      font-weight: 600 !important;
+      font-size: 11px !important;
+    }
+    html[data-style="dash"] .brand-icon {
+      background: #e6f9f2 !important;
+      border: 1px solid #bbf7d0 !important;
+      color: #00b87c !important;
+    }
+    html[data-style="dash"] .sidebar-nav .nav-link {
+      color: #64748b !important;
+      font-weight: 500 !important;
+      border-radius: 8px !important;
+      padding: 9px 12px !important;
+      font-size: 13px !important;
+      transition: all 0.15s ease !important;
+    }
+    html[data-style="dash"] .sidebar-nav .nav-link:hover {
+      background: #f8fafc !important;
+      color: #0f172a !important;
+    }
+    html[data-style="dash"] .sidebar-nav .nav-link.active {
+      background: #e6f9f2 !important;
+      color: #00b87c !important;
+      font-weight: 700 !important;
+      border: 1px solid #a7f3d0 !important;
+    }
+    html[data-style="dash"] .sidebar-nav .nav-link.active svg {
+      color: #00b87c !important;
+    }
+    html[data-style="dash"] .main-topbar {
+      background: #ffffff !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      padding: 12px 24px !important;
+    }
+    html[data-style="dash"] .search-input-box {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 8px !important;
+    }
+    html[data-style="dash"] .search-input-box input {
+      color: #1e293b !important;
+    }
+    html[data-style="dash"] .search-input-box input::placeholder {
+      color: #94a3b8 !important;
+    }
+    html[data-style="dash"] .btn-action {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #334155 !important;
+      border-radius: 8px !important;
+      font-weight: 600 !important;
+    }
+    html[data-style="dash"] .btn-action:hover {
+      background: #f8fafc !important;
+      border-color: #cbd5e1 !important;
+    }
+    html[data-style="dash"] .btn-primary {
+      background: #00b87c !important;
+      color: #ffffff !important;
+      border: none !important;
+      border-radius: 8px !important;
+      font-weight: 700 !important;
+      box-shadow: 0 2px 8px rgba(0, 184, 124, 0.25) !important;
+    }
+    html[data-style="dash"] .btn-primary:hover {
+      background: #009e6a !important;
+    }
+    html[data-style="dash"] .kpi-card {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+      border-radius: 12px !important;
+    }
+    html[data-style="dash"] .kpi-card:hover {
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+    }
+    html[data-style="dash"] .kpi-head {
+      color: #64748b !important;
+      font-size: 13px !important;
+    }
+    html[data-style="dash"] .kpi-value {
+      color: #0f172a !important;
+      font-weight: 800 !important;
+    }
+    html[data-style="dash"] .kpi-footer {
+      color: #64748b !important;
+    }
+    html[data-style="dash"] .panel-card {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
+      border-radius: 12px !important;
+    }
+    html[data-style="dash"] .panel-header h2 {
+      color: #0f172a !important;
+      font-weight: 800 !important;
+    }
+    html[data-style="dash"] .tab-btn {
+      color: #64748b !important;
+      font-weight: 600 !important;
+    }
+    html[data-style="dash"] .tab-btn.active {
+      color: #00b87c !important;
+      border-bottom-color: #00b87c !important;
+    }
+    html[data-style="dash"] .orders-table th {
+      background: #f8fafc !important;
+      color: #64748b !important;
+      font-weight: 700 !important;
+      font-size: 11.5px !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.5px !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      padding: 12px 14px !important;
+    }
+    html[data-style="dash"] .orders-table td {
+      border-bottom: 1px solid #f1f5f9 !important;
+      padding: 14px !important;
+      color: #334155 !important;
+    }
+    html[data-style="dash"] .orders-table tr:hover td {
+      background: #f8fafc !important;
+    }
+    html[data-style="dash"] .device-title {
+      color: #0f172a !important;
+      font-weight: 700 !important;
+      font-size: 14px !important;
+    }
+    html[data-style="dash"] .device-fault {
+      color: #64748b !important;
+      font-size: 12px !important;
+    }
+    html[data-style="dash"] .client-name {
+      color: #1e293b !important;
+      font-weight: 600 !important;
+    }
+    html[data-style="dash"] .client-phone {
+      color: #64748b !important;
+    }
+    html[data-style="dash"] .cost-text {
+      color: #0f172a !important;
+      font-weight: 800 !important;
+    }
+    html[data-style="dash"] .order-id {
+      color: #2563eb !important;
+      background: #eff6ff !important;
+      border: 1px solid #bfdbfe !important;
+      border-radius: 6px !important;
+      font-weight: 700 !important;
+      padding: 3px 8px !important;
+    }
+
+    /* Píldoras de Prioridad y Estado específicas de DASH */
+    .priority-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .priority-pill.priority {
+      background: #f3e8ff;
+      color: #7e22ce;
+    }
+    .priority-pill.standard {
+      background: #f1f5f9;
+      color: #475569;
+    }
+    .priority-pill.emergency {
+      background: #fee2e2;
+      color: #e11d48;
+    }
+
+    .dash-status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+    .dash-status-badge.testing { background: #1e3a8a; }
+    .dash-status-badge.diagnosed { background: #f59e0b; }
+    .dash-status-badge.received { background: #0284c7; }
+    .dash-status-badge.parts { background: #7c3aed; }
+    .dash-status-badge.in_progress { background: #f97316; }
+    .dash-status-badge.ready { background: #10b981; }
+
+    .dash-action-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+    .dash-action-btn:hover { transform: scale(1.15); }
+    .dash-action-btn.btn-assign { background: #f3e8ff; color: #8b5cf6; }
+    .dash-action-btn.btn-wa { background: #ecfdf5; color: #10b981; }
+    .dash-action-btn.btn-qr { background: #ecfeff; color: #06b6d4; }
+    .dash-action-btn.btn-edit { background: #eff6ff; color: #3b82f6; }
+    .dash-action-btn.btn-del { background: #fef2f2; color: #ef4444; }
+
+    .dash-breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+    .dash-breadcrumbs strong { color: #0f172a; font-weight: 600; }
+
+  
+    /* Alternar entre vista clásica de taller y vista Dash Mobile Service */
+    .view-dash-table { display: none; }
+    html[data-style="dash"] .view-default-table { display: none; }
+    html[data-style="dash"] .view-dash-table { display: block; }
+
+    html[data-style="dash"] .view-dash-table table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    html[data-style="dash"] .view-dash-table th {
+      background: #f8fafc;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: 10px 8px;
+      border-bottom: 1px solid #e2e8f0;
+      white-space: nowrap;
+    }
+    html[data-style="dash"] .view-dash-table td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+      font-size: 12.5px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    html[data-style="dash"] .view-dash-table tr:hover td {
+      background: #f8fafc;
+    }
+    .dash-id-link {
+      color: #2563eb;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .dash-id-link:hover {
+      text-decoration: underline;
+    }
+    .dash-email {
+      color: #64748b;
+      font-size: 12px;
+    }
+    .dash-toolbar-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .dash-search-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      max-width: 420px;
+    }
+    .dash-search-input {
+      width: 100%;
+      padding: 9px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13.5px;
+      outline: none;
+    }
+    .dash-search-input:focus {
+      border-color: #00b87c;
+      box-shadow: 0 0 0 2px rgba(0, 184, 124, 0.15);
+    }
+    .dash-btn-search {
+      background: #00b87c;
+      color: #ffffff;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13.5px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .dash-btn-search:hover {
+      background: #009e6a;
+    }
+    .dash-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      font-size: 12.5px;
+      color: #64748b;
+      border-top: 1px solid #f1f5f9;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .dash-pages-btns {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dash-page-btn {
+      padding: 5px 10px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #475569;
+      cursor: pointer;
+    }
+    .dash-page-btn.active {
+      background: #00b87c;
+      color: #ffffff;
+      border-color: #00b87c;
+      font-weight: 700;
+    }
+
   </style>
 </head>
 <body>
@@ -831,6 +1232,8 @@
         </button>
         <button class="segmented-btn" data-set-style="cyber">
           🪐 Obsidian Cyber
+                <button class="segmented-btn" data-set-style="dash">
+          📱 Dash Service (Light)
         </button>
       </div>
 
@@ -1004,6 +1407,7 @@
       </section>
 
       <!-- TABLA DE ÓRDENES ACTIVAS -->
+      <div class="view-default-table">
       <section class="panel-card">
         <div class="panel-header">
           <h2>Órdenes en Taller (Reparaciones Activas)</h2>
@@ -1121,6 +1525,190 @@
           </table>
         </div>
       </section>
+      </div>
+
+      <!-- VISTA DASH MOBILE SERVICE MANAGEMENT (REFERENCIA IMAGE.PNG) -->
+      <section class="view-dash-table">
+        <div class="dash-breadcrumbs">
+          <span>Dashboard</span> <span>›</span> <span>Mobile Service Management</span> <span>›</span> <strong>Service Requests</strong>
+        </div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <h1 style="font-size:22px;font-weight:800;color:#0f172a;margin:0;">Manage Service Requests</h1>
+          <button style="background:#00b87c;color:#fff;border:none;width:34px;height:34px;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;display:grid;place-items:center;">+</button>
+        </div>
+
+        <div class="dash-toolbar-card">
+          <div class="dash-search-group">
+            <input type="text" class="dash-search-input" placeholder="Search requests...">
+            <button class="dash-btn-search">Search</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#64748b;">
+            <select style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;color:#334155;background:#fff;">
+              <option>10 per page</option>
+              <option>25 per page</option>
+              <option>50 per page</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="panel-card" style="padding:0;overflow:hidden;">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Service ID</th>
+                  <th>Customer ⇅</th>
+                  <th>E-mail</th>
+                  <th>Service</th>
+                  <th>Device Model</th>
+                  <th>Assigned Technician</th>
+                  <th>Priority ⇅</th>
+                  <th>Status ⇅</th>
+                  <th>Created At ⇅</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><a href="#" class="dash-id-link">1770180979</a></td>
+                  <td><strong>Sophie Miller</strong></td>
+                  <td class="dash-email">sophie.miller@hotmail.com</td>
+                  <td>IT Support Service</td>
+                  <td><strong>iPhone 15 Pro</strong></td>
+                  <td>Isabelle Jerde</td>
+                  <td><span class="priority-pill priority">Priority</span></td>
+                  <td><span class="dash-status-badge testing">Testing</span></td>
+                  <td>01-08-2026</td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex;gap:5px;">
+                      <button class="dash-action-btn btn-assign" title="Asignar Técnico">👤</button>
+                      <button class="dash-action-btn btn-wa" title="Enviar WhatsApp">💬</button>
+                      <button class="dash-action-btn btn-qr" title="Ver Seguimiento QR">📱</button>
+                      <button class="dash-action-btn btn-edit" title="Editar Orden">✏️</button>
+                      <button class="dash-action-btn btn-del" title="Eliminar">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><a href="#" class="dash-id-link">1770180977</a></td>
+                  <td><strong>Grace Kim</strong></td>
+                  <td class="dash-email">grace.kim@yahoo.com</td>
+                  <td>Cambio de Batería</td>
+                  <td><strong>Samsung Galaxy A54</strong></td>
+                  <td>Laisha Prosacco</td>
+                  <td><span class="priority-pill standard">Standard</span></td>
+                  <td><span class="dash-status-badge diagnosed">Diagnosed</span></td>
+                  <td>12-21-2025</td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex;gap:5px;">
+                      <button class="dash-action-btn btn-assign" title="Asignar Técnico">👤</button>
+                      <button class="dash-action-btn btn-wa" title="Enviar WhatsApp">💬</button>
+                      <button class="dash-action-btn btn-qr" title="Ver Seguimiento QR">📱</button>
+                      <button class="dash-action-btn btn-edit" title="Editar Orden">✏️</button>
+                      <button class="dash-action-btn btn-del" title="Eliminar">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><a href="#" class="dash-id-link">1770180974</a></td>
+                  <td><strong>Steve Clark</strong></td>
+                  <td class="dash-email">steve.clark@hotmail.com</td>
+                  <td>IT Support Service</td>
+                  <td><strong>Sony Xperia 1 IV</strong></td>
+                  <td>Matías Barrios</td>
+                  <td><span class="priority-pill emergency">Emergency</span></td>
+                  <td><span class="dash-status-badge received">Received</span></td>
+                  <td>11-24-2025</td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex;gap:5px;">
+                      <button class="dash-action-btn btn-assign" title="Asignar Técnico">👤</button>
+                      <button class="dash-action-btn btn-wa" title="Enviar WhatsApp">💬</button>
+                      <button class="dash-action-btn btn-qr" title="Ver Seguimiento QR">📱</button>
+                      <button class="dash-action-btn btn-edit" title="Editar Orden">✏️</button>
+                      <button class="dash-action-btn btn-del" title="Eliminar">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><a href="#" class="dash-id-link">1770180971</a></td>
+                  <td><strong>Kate Wilson</strong></td>
+                  <td class="dash-email">kate.wilson@gmail.com</td>
+                  <td>Módulo OLED Original</td>
+                  <td><strong>Oppo Find X5</strong></td>
+                  <td>Raina McLaughlin</td>
+                  <td><span class="priority-pill standard">Standard</span></td>
+                  <td><span class="dash-status-badge parts">Awaiting Parts</span></td>
+                  <td>10-28-2025</td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex;gap:5px;">
+                      <button class="dash-action-btn btn-assign" title="Asignar Técnico">👤</button>
+                      <button class="dash-action-btn btn-wa" title="Enviar WhatsApp">💬</button>
+                      <button class="dash-action-btn btn-qr" title="Ver Seguimiento QR">📱</button>
+                      <button class="dash-action-btn btn-edit" title="Editar Orden">✏️</button>
+                      <button class="dash-action-btn btn-del" title="Eliminar">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><a href="#" class="dash-id-link">1770180968</a></td>
+                  <td><strong>Chris Lee</strong></td>
+                  <td class="dash-email">chris.lee@gmail.com</td>
+                  <td>Pin de Carga Tipo C</td>
+                  <td><strong>Samsung Galaxy Note 20</strong></td>
+                  <td>Elisha Macejkovic</td>
+                  <td><span class="priority-pill standard">Standard</span></td>
+                  <td><span class="dash-status-badge in_progress">In Progress</span></td>
+                  <td>10-01-2025</td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex;gap:5px;">
+                      <button class="dash-action-btn btn-assign" title="Asignar Técnico">👤</button>
+                      <button class="dash-action-btn btn-wa" title="Enviar WhatsApp">💬</button>
+                      <button class="dash-action-btn btn-qr" title="Ver Seguimiento QR">📱</button>
+                      <button class="dash-action-btn btn-edit" title="Editar Orden">✏️</button>
+                      <button class="dash-action-btn btn-del" title="Eliminar">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td><a href="#" class="dash-id-link">1770180964</a></td>
+                  <td><strong>Mike Wilson</strong></td>
+                  <td class="dash-email">mike.wilson@hotmail.com</td>
+                  <td>IT Support Service</td>
+                  <td><strong>Google Pixel 7</strong></td>
+                  <td>Jared Burris</td>
+                  <td><span class="priority-pill emergency">Emergency</span></td>
+                  <td><span class="dash-status-badge ready">Ready</span></td>
+                  <td>08-26-2025</td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex;gap:5px;">
+                      <button class="dash-action-btn btn-assign" title="Asignar Técnico">👤</button>
+                      <button class="dash-action-btn btn-wa" title="Enviar WhatsApp">💬</button>
+                      <button class="dash-action-btn btn-qr" title="Ver Seguimiento QR">📱</button>
+                      <button class="dash-action-btn btn-edit" title="Editar Orden">✏️</button>
+                      <button class="dash-action-btn btn-del" title="Eliminar">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="dash-pagination">
+            <span>Showing 1 to 6 of 6 results</span>
+            <div class="dash-pages-btns">
+              <button class="dash-page-btn">‹ Previous</button>
+              <button class="dash-page-btn active">1</button>
+              <button class="dash-page-btn">Next ›</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
     </main>
   </div>
@@ -1148,6 +1736,10 @@
   <!-- LÓGICA INTERACTIVA DEL SELECTOR -->
   <script>
     const descriptions = {
+      dash: {
+        title: "Dash Service (Light Enterprise SaaS - Referencia Solicitada)",
+        sub: "Inspirado fielmente en la referencia: fondo ultra limpio (#f8fafc), barra lateral blanca (#ffffff) con buscador de menús, enlaces azules (#2563eb) para números de orden, insignias de prioridad pastel y estados vibrantes (Testing, Diagnosed, Received, In Progress)."
+      },
       linear: {
         title: "Linear Pro (Técnico / Silicon Valley)",
         sub: "Grafito mate (#0c100e) con bordes milimétricos, acentos esmeralda sutiles e íconos vectoriales geométricos."

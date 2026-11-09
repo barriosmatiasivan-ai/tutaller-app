@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/taller/taller.css?v=20261108_v6">
+  <link rel="stylesheet" href="/taller/taller.css?v=20261108_v7">
 </head>
 <body>
   <!-- VISTA DE LOGIN EXCLUSIVA PARA EL TALLER (OTP PIN) -->
@@ -187,20 +187,32 @@
 
           <!-- FILA DE 4 TARJETAS KPI -->
           <div class="stats">
-            <button type="button" class="stat stat-action" id="kpi-active-btn" aria-label="Ver equipos en reparación">
-              <span class="stat-icon">🔧</span>
+            <button type="button" class="stat stat-action glow-cyan" id="kpi-active-btn" aria-label="Ver equipos en reparación">
+              <span class="stat-icon">
+                <span class="icon-classic">🔧</span>
+                <span class="icon-pro"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+              </span>
               <div><span>En reparación</span><strong id="kpi-active-count">0</strong></div>
             </button>
-            <button type="button" class="stat stat-action" id="kpi-ready-btn" aria-label="Ver listos para retirar">
-              <span class="stat-icon">✓</span>
+            <button type="button" class="stat stat-action glow-emerald" id="kpi-ready-btn" aria-label="Ver listos para retirar">
+              <span class="stat-icon">
+                <span class="icon-classic">✓</span>
+                <span class="icon-pro"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+              </span>
               <div><span>Listos para retirar</span><strong id="kpi-ready-count">0</strong></div>
             </button>
-            <button type="button" class="stat stat-action" id="kpi-parts-btn" aria-label="Ver esperando repuesto">
-              <span class="stat-icon">!</span>
+            <button type="button" class="stat stat-action glow-amber" id="kpi-parts-btn" aria-label="Ver esperando repuesto">
+              <span class="stat-icon">
+                <span class="icon-classic">!</span>
+                <span class="icon-pro"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+              </span>
               <div><span>Esperando repuesto</span><strong id="kpi-parts-count">0</strong></div>
             </button>
-            <button type="button" class="stat stat-action" id="kpi-clients-btn" aria-label="Ver clientes">
-              <span class="stat-icon">👥</span>
+            <button type="button" class="stat stat-action glow-neon" id="kpi-clients-btn" aria-label="Ver clientes">
+              <span class="stat-icon">
+                <span class="icon-classic">👥</span>
+                <span class="icon-pro"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+              </span>
               <div><span>Clientes</span><strong id="kpi-clients-count">0</strong></div>
             </button>
           </div>
@@ -333,20 +345,32 @@
           </div>
 
           <div class="stats" id="cash-stats-row">
-            <div class="stat">
-              <span class="stat-icon">💵</span>
+            <div class="stat glow-emerald">
+              <span class="stat-icon">
+                <span class="icon-classic">💵</span>
+                <span class="icon-pro"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
+              </span>
               <div><span>Total Ingresos</span><strong id="cash-income-total">$ 0</strong></div>
             </div>
-            <div class="stat">
-              <span class="stat-icon">📉</span>
+            <div class="stat glow-amber">
+              <span class="stat-icon">
+                <span class="icon-classic">📉</span>
+                <span class="icon-pro"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg></span>
+              </span>
               <div><span>Total Egresos</span><strong id="cash-expense-total">$ 0</strong></div>
             </div>
-            <div class="stat">
-              <span class="stat-icon">⚡</span>
+            <div class="stat glow-cyan">
+              <span class="stat-icon">
+                <span class="icon-classic">⚡</span>
+                <span class="icon-pro"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+              </span>
               <div><span>Mercado Pago</span><strong id="cash-mp-total">$ 0</strong></div>
             </div>
-            <div class="stat">
-              <span class="stat-icon">💰</span>
+            <div class="stat glow-neon">
+              <span class="stat-icon">
+                <span class="icon-classic">💰</span>
+                <span class="icon-pro"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+              </span>
               <div><span>Balance Neto</span><strong id="cash-net-total">$ 0</strong></div>
             </div>
           </div>
@@ -539,6 +563,6 @@
     </form>
   </dialog>
 
-  <script src="/taller/app.js?v=20261108_v6"></script>
+  <script src="/taller/app.js?v=20261108_v7"></script>
 </body>
 </html>

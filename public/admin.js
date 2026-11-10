@@ -589,4 +589,176 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // ==========================================
+  // Bot Central de WhatsApp (Super-Admin)
+  // ==========================================
+  const WA_DEFAULT_URL = 'https://tutaller-app-production.up.railway.app';
+  function getAdminWaUrl() {
+    return localStorage.getItem('tutaller_superadmin_wa_url') || WA_DEFAULT_URL;
+  }
+  function setAdminWaUrl(url) {
+    localStorage.setItem('tutaller_superadmin_wa_url', url);
+  }
+
+  const waStatusBadge = document.querySelector('#wa-admin-status-badge');
+  const waPhoneEl = document.querySelector('#wa-admin-phone');
+  const waServerEl = document.querySelector('#wa-admin-server-display');
+  const waUrlInput = document.querySelector('#wa-admin-url-input');
+  const btnOpenWaQr = document.querySelector('#btn-admin-open-wa-qr');
+  const btnTestWa = document.querySelector('#btn-admin-test-wa');
+  const btnSaveWaUrl = document.querySelector('#btn-admin-save-wa-url');
+  const btnDisconnectWa = document.querySelector('#btn-admin-disconnect-wa');
+  const btnModalDisconnect = document.querySelector('#btn-admin-modal-disconnect');
+
+  const waQrModal = document.querySelector('#admin-wa-qr-dialog');
+  const closeWaQrBtn = document.querySelector('#close-admin-wa-qr-btn');
+  const waQrLoading = document.querySelector('#admin-wa-qr-loading');
+  const waQrContainer = document.querySelector('#admin-wa-qr-container');
+  const waQrConnected = document.querySelector('#admin-wa-qr-connected');
+  const waQrImg = document.querySelector('#admin-wa-qr-img');
+  const waPhoneVal = document.querySelector('#admin-wa-phone-val');
+
+  let waAdminPollInterval = null;
+
+  async function checkAdminWaStatus() {
+    const url = getAdminWaUrl();
+    if (waUrlInput) waUrlInput.value = url;
+    if (waServerEl) waServerEl.textContent = url.replace(/^https?:\/\//, '');
+
+    try {
+      const res = await fetch(`${url.replace(/\/+$/, '')}/api/status`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (data.state === 'connected') {
+        if (waStatusBadge) {
+          waStatusBadge.textContent = '🟢 Conectado';
+          waStatusBadge.style.color = '#10b981';
+        }
+        if (waPhoneEl) waPhoneEl.textContent = data.phone ? `+${data.phone}` : 'Línea activa';
+        if (btnOpenWaQr) btnOpenWaQr.innerHTML = '<span>🟢</span> Ver Conexión';
+      } else if (data.state === 'qr_ready') {
+        if (waStatusBadge) {
+          waStatusBadge.textContent = '🟡 Esperando escaneo';
+          waStatusBadge.style.color = '#f59e0b';
+        }
+        if (waPhoneEl) waPhoneEl.textContent = 'Pendiente de vincular';
+        if (btnOpenWaQr) btnOpenWaQr.innerHTML = '<span>📲</span> Escanear QR';
+      } else {
+        if (waStatusBadge) {
+          waStatusBadge.textContent = '⚪ Desconectado';
+          waStatusBadge.style.color = '#94a3b8';
+        }
+        if (waPhoneEl) waPhoneEl.textContent = '-';
+        if (btnOpenWaQr) btnOpenWaQr.innerHTML = '<span>📲</span> Vincular QR';
+      }
+    } catch (err) {
+      if (waStatusBadge) {
+        waStatusBadge.textContent = '🔴 Inaccesible';
+        waStatusBadge.style.color = '#ef4444';
+      }
+      if (waPhoneEl) waPhoneEl.textContent = 'Servidor sin respuesta';
+    }
+  }
+
+  async function openAdminWaQrModal() {
+    if (!waQrModal) return;
+    const url = getAdminWaUrl();
+
+    if (waQrLoading) waQrLoading.style.display = 'block';
+    if (waQrContainer) waQrContainer.style.display = 'none';
+    if (waQrConnected) waQrConnected.style.display = 'none';
+
+    waQrModal.showModal();
+
+    if (waAdminPollInterval) clearInterval(waAdminPollInterval);
+
+    const fetchQr = async () => {
+      try {
+        const res = await fetch(`${url.replace(/\/+$/, '')}/api/qr?format=json`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (data.connected) {
+          if (waQrLoading) waQrLoading.style.display = 'none';
+          if (waQrContainer) waQrContainer.style.display = 'none';
+          if (waQrConnected) waQrConnected.style.display = 'block';
+          if (waPhoneVal) waPhoneVal.textContent = data.phone ? `+${data.phone}` : 'Línea conectada';
+          clearInterval(waAdminPollInterval);
+          checkAdminWaStatus();
+          return;
+        }
+
+        if (data.qr) {
+          if (waQrImg) waQrImg.src = data.qr;
+          if (waQrLoading) waQrLoading.style.display = 'none';
+          if (waQrConnected) waQrConnected.style.display = 'none';
+          if (waQrContainer) waQrContainer.style.display = 'block';
+        }
+      } catch (err) {
+        if (waQrLoading) waQrLoading.innerHTML = `<p style="color:#ef4444;">Error conectando al bot: ${err.message}</p>`;
+      }
+    };
+
+    fetchQr();
+    waAdminPollInterval = setInterval(fetchQr, 3500);
+
+    waQrModal.onclose = () => {
+      if (waAdminPollInterval) clearInterval(waAdminPollInterval);
+      checkAdminWaStatus();
+    };
+  }
+
+  async function disconnectAdminWa() {
+    const url = getAdminWaUrl();
+    if (!confirm('¿Seguro que deseás desvincular la línea de WhatsApp?')) return;
+    try {
+      const res = await fetch(`${url.replace(/\/+$/, '')}/api/disconnect`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast('WhatsApp desvinculado con éxito');
+      waQrModal?.close();
+    } catch (err) {
+      toast(`Error al desvincular: ${err.message}`, true);
+    } finally {
+      checkAdminWaStatus();
+    }
+  }
+
+  btnOpenWaQr?.addEventListener('click', openAdminWaQrModal);
+  closeWaQrBtn?.addEventListener('click', () => waQrModal?.close());
+  btnDisconnectWa?.addEventListener('click', disconnectAdminWa);
+  btnModalDisconnect?.addEventListener('click', disconnectAdminWa);
+
+  btnSaveWaUrl?.addEventListener('click', () => {
+    const newUrl = waUrlInput?.value.trim();
+    if (newUrl) {
+      setAdminWaUrl(newUrl);
+      toast('URL del servidor bot guardada');
+      checkAdminWaStatus();
+    }
+  });
+
+  btnTestWa?.addEventListener('click', async () => {
+    const url = getAdminWaUrl();
+    toast('Comprobando servidor bot... ⏳');
+    try {
+      const res = await fetch(`${url.replace(/\/+$/, '')}/health`);
+      if (res.ok) {
+        toast('🟢 Servidor Bot activo y respondiendo correctamente');
+      } else {
+        toast(`⚠️ Servidor respondió con código ${res.status}`, true);
+      }
+    } catch (e) {
+      toast(`🔴 Error al conectar: ${e.message}`, true);
+    }
+    checkAdminWaStatus();
+  });
+
+  // Chequear estado del bot al iniciar la vista
+  checkAdminWaStatus();
 });

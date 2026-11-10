@@ -201,7 +201,7 @@ function getWaBotConfig() {
     if (raw) return JSON.parse(raw);
   } catch (e) {}
   return {
-    url: '',
+    url: 'https://tutaller-app-production.up.railway.app',
     apiKey: '',
     autoIntake: true,
     autoReady: true,
@@ -1011,15 +1011,6 @@ function renderSettings() {
   setChk('#pm-efectivo', pms.includes('efectivo'));
   setChk('#pm-transferencia', pms.includes('transferencia'));
   setChk('#pm-tarjeta', pms.includes('tarjeta'));
-
-  // WhatsApp Bot QR
-  const waCfg = getWaBotConfig();
-  setVal('#set-wa-bot-url', waCfg.url);
-  setVal('#set-wa-bot-key', waCfg.apiKey);
-  setChk('#set-wa-auto-intake', waCfg.autoIntake !== false);
-  setChk('#set-wa-auto-ready', waCfg.autoReady !== false);
-  setChk('#set-wa-auto-delivered', waCfg.autoDelivered !== false);
-  updateWaBotStatusUI();
 }
 
 // Modal nuevo equipo
@@ -1377,52 +1368,6 @@ function initEvents() {
       toast(`Error al importar copia: ${err.message}`, true);
     }
   });
-
-  // Bot de WhatsApp QR
-  document.querySelector('#btn-open-wa-qr')?.addEventListener('click', openWaQrModal);
-  document.querySelector('#btn-disconnect-wa')?.addEventListener('click', disconnectWaBot);
-  document.querySelector('#btn-save-wa-config')?.addEventListener('click', () => {
-    const cfg = getWaBotConfig();
-    const urlInp = document.querySelector('#set-wa-bot-url');
-    const keyInp = document.querySelector('#set-wa-bot-key');
-    if (urlInp) cfg.url = urlInp.value.trim();
-    if (keyInp) cfg.apiKey = keyInp.value.trim();
-    saveWaBotConfig(cfg);
-    toast('Configuración de servidor guardada');
-    updateWaBotStatusUI();
-  });
-  document.querySelector('#btn-test-wa-bot')?.addEventListener('click', async () => {
-    const cfg = getWaBotConfig();
-    if (!cfg.url) {
-      toast('Ingresá primero la URL del servidor bot', true);
-      return;
-    }
-    toast('Comprobando servidor bot... ⏳');
-    try {
-      const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/health`);
-      if (res.ok) {
-        toast('🟢 Servidor bot activo y respondiendo correctamente');
-      } else {
-        toast(`⚠️ Servidor respondió con código ${res.status}`, true);
-      }
-    } catch (e) {
-      toast(`🔴 Error al conectar: ${e.message}`, true);
-    }
-    updateWaBotStatusUI();
-  });
-
-  const bindWaToggle = (id, key) => {
-    const el = document.querySelector(id);
-    el?.addEventListener('change', () => {
-      const cfg = getWaBotConfig();
-      cfg[key] = el.checked;
-      saveWaBotConfig(cfg);
-      toast('Preferencia de aviso actualizada');
-    });
-  };
-  bindWaToggle('#set-wa-auto-intake', 'autoIntake');
-  bindWaToggle('#set-wa-auto-ready', 'autoReady');
-  bindWaToggle('#set-wa-auto-delivered', 'autoDelivered');
 }
 
 let pendingAuthEmail = '';

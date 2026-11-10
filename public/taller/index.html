@@ -461,61 +461,6 @@
           </section>
 
           <section class="panel" style="margin-top:16px;">
-            <h2>Bot de WhatsApp Automático (Código QR)</h2>
-            <p class="muted">Conectá el celular del taller escaneando un código QR para que los avisos a clientes salgan 100% automáticos.</p>
-            
-            <div id="wa-bot-status-card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:14px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;margin:14px 0;">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <span id="wa-bot-status-icon" style="font-size:22px;">⚪</span>
-                <div>
-                  <strong id="wa-bot-status-text" style="display:block;font-size:14px;color:#f1f5f9;">Desconectado / Sin vincular</strong>
-                  <small id="wa-bot-status-sub" class="muted">Configurá la URL de tu bot o vinculá tu celular</small>
-                </div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <button type="button" class="primary compact" id="btn-open-wa-qr">📲 Vincular Celular (QR)</button>
-                <button type="button" class="secondary compact" id="btn-disconnect-wa" style="display:none;color:#ef4444;border-color:rgba(239,68,68,0.4);">Desconectar</button>
-              </div>
-            </div>
-
-            <!-- Disparadores automáticos -->
-            <div class="wide" style="margin-top:14px;">
-              <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px;">Notificaciones automáticas al cliente</label>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:10px;">
-                <label class="checkbox-pill">
-                  <input type="checkbox" id="set-wa-auto-intake" checked>
-                  📥 Aviso de ingreso con QR y seguimiento
-                </label>
-                <label class="checkbox-pill">
-                  <input type="checkbox" id="set-wa-auto-ready" checked>
-                  ✅ Aviso cuando esté "Listo para retirar"
-                </label>
-                <label class="checkbox-pill">
-                  <input type="checkbox" id="set-wa-auto-delivered" checked>
-                  📦 Aviso de entrega y garantía
-                </label>
-              </div>
-            </div>
-
-            <!-- Configuración avanzada de URL del bot -->
-            <details style="margin-top:14px;font-size:13px;">
-              <summary style="cursor:pointer;color:var(--muted);font-weight:600;">⚙ Servidor del Bot de WhatsApp (Avanzado)</summary>
-              <div style="padding-top:12px;display:grid;gap:10px;">
-                <label>URL del servidor Bot QR
-                  <input type="url" id="set-wa-bot-url" placeholder="https://tu-bot.up.railway.app" style="font-family:monospace;font-size:13px;">
-                </label>
-                <label>Clave de acceso / API Key (opcional)
-                  <input type="password" id="set-wa-bot-key" placeholder="Opcional">
-                </label>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                  <button type="button" class="secondary compact" id="btn-save-wa-config">Guardar servidor</button>
-                  <button type="button" class="secondary compact" id="btn-test-wa-bot">Probar conexión</button>
-                </div>
-              </div>
-            </details>
-          </section>
-
-          <section class="panel" style="margin-top:16px;">
             <h2>Copia de seguridad y migración</h2>
             <p class="muted">¿Venís de probar la versión de 48 horas? Podés importar tu archivo JSON para transferir tus clientes y órdenes a este taller en Cloudflare D1.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
@@ -618,44 +563,6 @@
     </form>
   </dialog>
 
-  <!-- Modal Escaneo de QR de WhatsApp -->
-  <dialog id="wa-qr-dialog" class="custom-dialog" style="max-width:440px;width:92vw;">
-    <div class="modal-heading">
-      <h2>Vincular WhatsApp del Taller</h2>
-      <button type="button" class="icon-button" onclick="document.getElementById('wa-qr-dialog').close();">×</button>
-    </div>
-    <div id="wa-qr-body" style="text-align:center;padding:6px 0;">
-      <div id="wa-qr-loading">
-        <p class="loading" style="padding:40px 0;">Conectando con el bot y generando código QR…</p>
-      </div>
-      <div id="wa-qr-container" style="display:none;">
-        <div style="background:#ffffff;padding:12px;border-radius:12px;display:inline-block;margin:10px auto;">
-          <img id="wa-qr-img" src="" alt="Código QR WhatsApp" style="width:240px;height:240px;display:block;">
-        </div>
-        <ol style="text-align:left;max-width:320px;margin:12px auto;font-size:13px;line-height:1.6;color:#cbd5e1;">
-          <li>Abrí WhatsApp en el celular del taller</li>
-          <li>Tocá <strong>Menú (⋮)</strong> o <strong>Configuración</strong></li>
-          <li>Elegí <strong>Dispositivos vinculados</strong></li>
-          <li>Tocá <strong>Vincular un dispositivo</strong> y apuntá al código QR</li>
-        </ol>
-        <p style="font-size:12px;color:#94a3b8;margin:8px 0 0 0;">El estado se actualizará automáticamente apenas lo escanees.</p>
-      </div>
-      <div id="wa-qr-connected" style="display:none;padding:24px 10px;">
-        <div style="font-size:46px;margin-bottom:8px;">🎉</div>
-        <h3 style="color:#10b981;margin-bottom:6px;font-size:20px;">¡WhatsApp Vinculado con Éxito!</h3>
-        <p style="font-size:14px;color:#cbd5e1;margin-bottom:6px;">Número: <strong id="wa-connected-phone-display" style="color:#fff;font-size:16px;"></strong></p>
-        <p class="muted small" style="max-width:320px;margin:10px auto;line-height:1.4;">Ahora tu taller enviará los avisos de ingreso, presupuestos y entregas automáticamente en segundo plano.</p>
-        <button type="button" class="primary" style="margin-top:14px;width:100%;" onclick="document.getElementById('wa-qr-dialog').close();">Listo, empezar a usar</button>
-      </div>
-      <div id="wa-qr-error" style="display:none;padding:20px 0;">
-        <div style="font-size:40px;margin-bottom:8px;">⚠️</div>
-        <h3 style="color:#ef4444;margin-bottom:6px;">No se pudo conectar al bot</h3>
-        <p id="wa-qr-error-msg" class="muted small" style="margin:8px auto 16px;max-width:320px;">Verificá que la URL del servidor bot esté configurada y activa.</p>
-        <button type="button" class="secondary" onclick="document.getElementById('wa-qr-dialog').close();">Cerrar</button>
-      </div>
-    </div>
-  </dialog>
-
-  <script src="/taller/app.js?v=20261110_wa1"></script>
+  <script src="/taller/app.js?v=20261110_wa2"></script>
 </body>
 </html>

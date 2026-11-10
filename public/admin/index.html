@@ -179,6 +179,52 @@
         </div>
       </div>
     </section>
+
+    <!-- Bot Central de WhatsApp (TuTaller Soft) -->
+    <section class="maintenance-section" style="margin-top:24px;">
+      <div class="maintenance-header">
+        <div class="maintenance-title">
+          <span>📲</span>
+          <div>
+            <h3>Bot Central de WhatsApp (Baileys)</h3>
+            <span class="admin-meta">Conexión oficial de WhatsApp para avisos automáticos de ingresos, retiros y entregas</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="primary" id="btn-admin-open-wa-qr" type="button">
+            <span>📲</span> Vincular / Ver QR
+          </button>
+          <button class="secondary" id="btn-admin-test-wa" type="button">
+            <span>⚡</span> Probar Conexión
+          </button>
+        </div>
+      </div>
+
+      <div class="storage-metrics-grid" style="margin-top:16px;">
+        <div class="storage-stat-box">
+          <span class="storage-stat-label">Estado del Bot</span>
+          <span class="storage-stat-val" id="wa-admin-status-badge" style="font-size:16px;color:#10b981;">Consultando...</span>
+        </div>
+        <div class="storage-stat-box">
+          <span class="storage-stat-label">Línea Oficial Conectada</span>
+          <span class="storage-stat-val" id="wa-admin-phone" style="font-size:16px;font-family:monospace;">-</span>
+        </div>
+        <div class="storage-stat-box">
+          <span class="storage-stat-label">Servidor en Railway</span>
+          <span class="storage-stat-val" id="wa-admin-server-display" style="font-size:12px;font-family:monospace;color:#94a3b8;word-break:break-all;">tutaller-app-production.up.railway.app</span>
+        </div>
+      </div>
+
+      <!-- Ajuste avanzado de URL -->
+      <details style="margin-top:16px;font-size:13px;">
+        <summary style="cursor:pointer;color:var(--text-muted);font-weight:600;">⚙ Configuración del servidor del bot</summary>
+        <div style="padding-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <input type="url" id="wa-admin-url-input" value="https://tutaller-app-production.up.railway.app" placeholder="https://tutaller-app-production.up.railway.app" style="flex:1;min-width:280px;font-family:monospace;font-size:13px;padding:8px 12px;border-radius:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;">
+          <button type="button" class="secondary" id="btn-admin-save-wa-url">Guardar Servidor</button>
+          <button type="button" class="secondary" id="btn-admin-disconnect-wa" style="color:#ef4444;border-color:rgba(239,68,68,0.4);">Desvincular</button>
+        </div>
+      </details>
+    </section>
   </div>
 </div><!-- /dashboard-view -->
 
@@ -323,9 +369,37 @@
     </form>
   </dialog>
 
+  <!-- Modal: Vincular WhatsApp (Super-Admin) -->
+  <dialog id="admin-wa-qr-dialog" style="max-width:440px;width:92vw;text-align:center;">
+    <div class="modal-header">
+      <h2>WhatsApp Central · TuTaller</h2>
+      <button class="close-btn" id="close-admin-wa-qr-btn">✕</button>
+    </div>
+    <div style="padding:16px 8px;">
+      <div id="admin-wa-qr-loading">
+        <p style="color:var(--text-muted);padding:30px 0;">Consultando estado del bot...</p>
+      </div>
+      <div id="admin-wa-qr-container" style="display:none;">
+        <div style="background:#fff;padding:12px;border-radius:12px;display:inline-block;margin:10px auto;">
+          <img id="admin-wa-qr-img" src="" alt="Código QR WhatsApp" style="width:240px;height:240px;display:block;">
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-top:10px;">Escaneá con tu celular desde WhatsApp > Dispositivos vinculados</p>
+      </div>
+      <div id="admin-wa-qr-connected" style="display:none;padding:20px 0;">
+        <div style="font-size:44px;margin-bottom:8px;">🟢</div>
+        <h3 style="color:#10b981;margin-bottom:6px;">WhatsApp Conectado con Éxito</h3>
+        <p style="font-size:16px;color:#fff;margin-bottom:6px;">Línea: <strong id="admin-wa-phone-val"></strong></p>
+        <p style="font-size:13px;color:var(--text-muted);line-height:1.5;">El bot está listo para enviar avisos automáticos a los clientes de TuTaller Soft.</p>
+        <button type="button" class="secondary" id="btn-admin-modal-disconnect" style="margin-top:16px;color:#ef4444;border-color:rgba(239,68,68,0.4);">
+          Desvincular línea
+        </button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="/admin.js?v=20261108_prop"></script>
+  <script src="/admin.js?v=20261110_wa1"></script>
 </body>
 </html>

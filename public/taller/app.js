@@ -190,6 +190,244 @@ function modal(title, content) {
   return d;
 }
 
+// ==========================================
+// Integración con Bot de WhatsApp QR (Baileys)
+// ==========================================
+const WA_BOT_STORAGE_KEY = 'tutaller_wa_bot_config';
+
+function getWaBotConfig() {
+  try {
+    const raw = localStorage.getItem(WA_BOT_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {
+    url: '',
+    apiKey: '',
+    autoIntake: true,
+    autoReady: true,
+    autoDelivered: true
+  };
+}
+
+function saveWaBotConfig(cfg) {
+  try {
+    localStorage.setItem(WA_BOT_STORAGE_KEY, JSON.stringify(cfg));
+  } catch (e) {}
+}
+
+async function updateWaBotStatusUI() {
+  const cfg = getWaBotConfig();
+  const iconEl = document.querySelector('#wa-bot-status-icon');
+  const textEl = document.querySelector('#wa-bot-status-text');
+  const subEl = document.querySelector('#wa-bot-status-sub');
+  const btnQr = document.querySelector('#btn-open-wa-qr');
+  const btnDisc = document.querySelector('#btn-disconnect-wa');
+
+  if (!iconEl || !textEl || !subEl) return;
+
+  if (!cfg.url) {
+    iconEl.textContent = '⚪';
+    textEl.textContent = 'Desconectado / Sin vincular';
+    subEl.textContent = 'Configurá la URL de tu bot o vinculá tu celular para envíos automáticos';
+    if (btnQr) btnQr.textContent = '📲 Vincular Celular (QR)';
+    if (btnDisc) btnDisc.style.display = 'none';
+    return;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const headers = { 'Accept': 'application/json' };
+    if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+
+    const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/api/status`, {
+      headers,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (data.state === 'connected') {
+      iconEl.textContent = '🟢';
+      textEl.textContent = 'Conectado y activo';
+      subEl.textContent = `Celular vinculado: +${data.phone || 'OK'} • Notificaciones listas`;
+      if (btnQr) btnQr.textContent = '🔄 Cambiar dispositivo';
+      if (btnDisc) btnDisc.style.display = 'inline-block';
+    } else if (data.state === 'qr_ready') {
+      iconEl.textContent = '🟡';
+      textEl.textContent = 'Esperando escaneo de QR';
+      subEl.textContent = 'Abrí el modal para escanear el código con tu WhatsApp';
+      if (btnQr) btnQr.textContent = '📲 Escanear QR ahora';
+      if (btnDisc) btnDisc.style.display = 'none';
+    } else {
+      iconEl.textContent = '⚪';
+      textEl.textContent = 'Desconectado';
+      subEl.textContent = 'El bot está iniciado pero aún no tiene sesión activa';
+      if (btnQr) btnQr.textContent = '📲 Vincular Celular (QR)';
+      if (btnDisc) btnDisc.style.display = 'none';
+    }
+  } catch (err) {
+    iconEl.textContent = '🔴';
+    textEl.textContent = 'Servidor inaccesible';
+    subEl.textContent = `No se pudo conectar con ${cfg.url}`;
+    if (btnQr) btnQr.textContent = '📲 Probar vincular';
+    if (btnDisc) btnDisc.style.display = 'none';
+  }
+}
+
+let waQrPollInterval = null;
+
+async function openWaQrModal() {
+  const cfg = getWaBotConfig();
+  const dlg = document.querySelector('#wa-qr-dialog');
+  if (!dlg) return;
+
+  const loadingEl = document.querySelector('#wa-qr-loading');
+  const contEl = document.querySelector('#wa-qr-container');
+  const connEl = document.querySelector('#wa-qr-connected');
+  const errEl = document.querySelector('#wa-qr-error');
+  const errMsg = document.querySelector('#wa-qr-error-msg');
+  const imgEl = document.querySelector('#wa-qr-img');
+
+  if (!cfg.url) {
+    const inputUrl = prompt('Ingresá la URL de tu servidor Bot de WhatsApp (ejemplo: https://mi-bot.up.railway.app):', '');
+    if (!inputUrl) return;
+    cfg.url = inputUrl.trim();
+    saveWaBotConfig(cfg);
+    const setUrlInp = document.querySelector('#set-wa-bot-url');
+    if (setUrlInp) setUrlInp.value = cfg.url;
+  }
+
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (contEl) contEl.style.display = 'none';
+  if (connEl) connEl.style.display = 'none';
+  if (errEl) errEl.style.display = 'none';
+
+  dlg.showModal();
+
+  if (waQrPollInterval) clearInterval(waQrPollInterval);
+
+  const fetchQr = async () => {
+    try {
+      const headers = { 'Accept': 'application/json' };
+      if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+
+      const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/api/qr?format=json`, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (data.connected) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (contEl) contEl.style.display = 'none';
+        if (errEl) errEl.style.display = 'none';
+        if (connEl) connEl.style.display = 'block';
+        const phoneDisp = document.querySelector('#wa-connected-phone-display');
+        if (phoneDisp) phoneDisp.textContent = data.phone ? `+${data.phone}` : 'Dispositivo vinculado';
+        clearInterval(waQrPollInterval);
+        updateWaBotStatusUI();
+        return;
+      }
+
+      if (data.qr) {
+        if (imgEl) imgEl.src = data.qr;
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (errEl) errEl.style.display = 'none';
+        if (contEl) contEl.style.display = 'block';
+      }
+    } catch (err) {
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (contEl) contEl.style.display = 'none';
+      if (errEl) errEl.style.display = 'block';
+      if (errMsg) errMsg.textContent = `Error al comunicar con ${cfg.url}: ${err.message}`;
+    }
+  };
+
+  fetchQr();
+  waQrPollInterval = setInterval(fetchQr, 3500);
+
+  dlg.onclose = () => {
+    if (waQrPollInterval) clearInterval(waQrPollInterval);
+    updateWaBotStatusUI();
+  };
+}
+
+async function disconnectWaBot() {
+  const cfg = getWaBotConfig();
+  if (!cfg.url) return;
+  if (!confirm('¿Seguro que deseás desvincular el celular de WhatsApp? Los envíos automáticos se pausarán.')) return;
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+    const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/api/disconnect`, { method: 'POST', headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    toast('WhatsApp desvinculado con éxito');
+  } catch (err) {
+    toast(`Error al desvincular: ${err.message}`, true);
+  } finally {
+    updateWaBotStatusUI();
+  }
+}
+
+async function sendWaBotMessage(phone, message) {
+  const cfg = getWaBotConfig();
+  if (!cfg.url || !phone) return null;
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+
+    const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/api/send`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ phone, message })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    console.warn('No se pudo enviar WhatsApp bot:', err);
+    return null;
+  }
+}
+
+async function triggerAutoWhatsApp(order, type) {
+  const cfg = getWaBotConfig();
+  if (!cfg.url) return;
+
+  if (type === 'intake' && !cfg.autoIntake) return;
+  if (type === 'ready' && !cfg.autoReady) return;
+  if (type === 'delivered' && !cfg.autoDelivered) return;
+
+  const phone = order.client_phone || '';
+  if (!phone) return;
+
+  const clientName = order.client_name || 'Estimado/a cliente';
+  const workshopName = currentWorkshop?.name || 'Tu Taller';
+  const trackingUrl = `${location.origin}/seguimiento/${order.intake_key || order.id}`;
+
+  let text = '';
+  if (type === 'intake') {
+    text = `Hola ${clientName}! 👋 Te confirmamos el ingreso de tu *${order.brand || ''} ${order.model || 'equipo'}* a *${workshopName}*.\n\n📋 *Orden de servicio:* #${order.order_number}\n🔍 *Seguimiento en vivo y presupuesto:*\n${trackingUrl}\n\n¡Muchas gracias por confiar en nuestro servicio!`;
+  } else if (type === 'ready') {
+    text = `Hola ${clientName}! 🔔 Te avisamos de *${workshopName}* que tu *${order.brand || ''} ${order.model || 'equipo'}* (Orden #${order.order_number}) ya está *LISTO PARA RETIRAR*.\n\n📍 Podés pasar a retirarlo por nuestro local.\n🔍 Ver comprobante de entrega:\n${trackingUrl}`;
+  } else if (type === 'delivered') {
+    text = `Hola ${clientName}! ✅ Tu *${order.brand || ''} ${order.model || 'equipo'}* (Orden #${order.order_number}) fue retirado con éxito de *${workshopName}*.\n\n🛡️ Muchas gracias por confiar en nosotros. ¡Cualquier consulta estamos a disposición!`;
+  }
+
+  if (!text) return;
+
+  const result = await sendWaBotMessage(phone, text);
+  if (result && result.success) {
+    toast(`📲 Aviso automático enviado por WhatsApp a ${clientName}`);
+  }
+}
+
 // Carga inicial del taller
 async function loadWorkshop() {
   currentSlug = getSlug();
@@ -569,15 +807,32 @@ function openOrderDetailModal(order) {
       ${order.client_phone ? `
         <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);">
           <label>Aviso rápido por WhatsApp</label>
-          <a class="primary" style="margin-top:8px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop?.name || 'el taller'} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
-            💬 Notificar al cliente por WhatsApp
-          </a>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            <button type="button" class="primary compact" id="btn-modal-send-wa-bot" style="display:flex;align-items:center;gap:6px;">
+              🤖 Enviar aviso automático (Bot QR)
+            </button>
+            <a class="secondary compact" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop?.name || 'el taller'} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
+              💬 Abrir chat manual (wa.me)
+            </a>
+          </div>
         </div>
       ` : ''}
     </div>
   `);
 
   if (!d) return;
+
+  d.querySelector('#btn-modal-send-wa-bot')?.addEventListener('click', async () => {
+    const currentSt = d.querySelector('#edit-order-status')?.value || order.status;
+    toast('Enviando aviso por WhatsApp... ⏳');
+    const msg = `Hola ${clientName}! 👋 Te escribimos de *${currentWorkshop?.name || 'el taller'}* para contarte que tu *${order.brand || ''} ${order.model || 'equipo'}* (Orden #${order.order_number}) ya se encuentra *${STATUS_CONFIG[currentSt]?.label || currentSt}*.\n\n🔍 Podés seguir el estado en vivo acá:\n${location.origin}${trackingUrl}`;
+    const res = await sendWaBotMessage(order.client_phone, msg);
+    if (res && res.success) {
+      toast('✅ ¡Mensaje enviado con éxito al cliente!');
+    } else {
+      toast('⚠️ Bot no disponible. Podés usar "Abrir chat manual".', true);
+    }
+  });
 
   d.querySelector('#order-status-form')?.addEventListener('submit', async e => {
     e.preventDefault();
@@ -591,6 +846,12 @@ function openOrderDetailModal(order) {
       toast(`Orden #${order.order_number} actualizada a "${STATUS_CONFIG[newStatus]?.label || newStatus}"`);
       d.close();
       renderCurrentSection();
+
+      if (newStatus === 'ready') {
+        triggerAutoWhatsApp(order, 'ready');
+      } else if (newStatus === 'delivered') {
+        triggerAutoWhatsApp(order, 'delivered');
+      }
     } catch (err) {
       toast(err.message, true);
     }
@@ -750,6 +1011,15 @@ function renderSettings() {
   setChk('#pm-efectivo', pms.includes('efectivo'));
   setChk('#pm-transferencia', pms.includes('transferencia'));
   setChk('#pm-tarjeta', pms.includes('tarjeta'));
+
+  // WhatsApp Bot QR
+  const waCfg = getWaBotConfig();
+  setVal('#set-wa-bot-url', waCfg.url);
+  setVal('#set-wa-bot-key', waCfg.apiKey);
+  setChk('#set-wa-auto-intake', waCfg.autoIntake !== false);
+  setChk('#set-wa-auto-ready', waCfg.autoReady !== false);
+  setChk('#set-wa-auto-delivered', waCfg.autoDelivered !== false);
+  updateWaBotStatusUI();
 }
 
 // Modal nuevo equipo
@@ -834,6 +1104,27 @@ function openNewOrderModal() {
       });
       toast(`¡Orden #${res.order_number} ingresada con éxito!`);
       d.close();
+
+      let clientPhone = payload.client_phone || '';
+      let clientName = payload.client_name || '';
+      if (payload.client_id && payload.client_id !== 'NEW') {
+        const found = (workshopData.clients || []).find(c => String(c.id) === String(payload.client_id));
+        if (found) {
+          clientPhone = found.phone || clientPhone;
+          clientName = found.name || clientName;
+        }
+      }
+
+      triggerAutoWhatsApp({
+        id: res.id,
+        order_number: res.order_number,
+        intake_key: res.intake_key,
+        brand: payload.brand,
+        model: payload.model,
+        client_phone: clientPhone,
+        client_name: clientName
+      }, 'intake');
+
       await loadWorkshop();
     } catch (err) {
       toast(err.message, true);
@@ -1086,6 +1377,52 @@ function initEvents() {
       toast(`Error al importar copia: ${err.message}`, true);
     }
   });
+
+  // Bot de WhatsApp QR
+  document.querySelector('#btn-open-wa-qr')?.addEventListener('click', openWaQrModal);
+  document.querySelector('#btn-disconnect-wa')?.addEventListener('click', disconnectWaBot);
+  document.querySelector('#btn-save-wa-config')?.addEventListener('click', () => {
+    const cfg = getWaBotConfig();
+    const urlInp = document.querySelector('#set-wa-bot-url');
+    const keyInp = document.querySelector('#set-wa-bot-key');
+    if (urlInp) cfg.url = urlInp.value.trim();
+    if (keyInp) cfg.apiKey = keyInp.value.trim();
+    saveWaBotConfig(cfg);
+    toast('Configuración de servidor guardada');
+    updateWaBotStatusUI();
+  });
+  document.querySelector('#btn-test-wa-bot')?.addEventListener('click', async () => {
+    const cfg = getWaBotConfig();
+    if (!cfg.url) {
+      toast('Ingresá primero la URL del servidor bot', true);
+      return;
+    }
+    toast('Comprobando servidor bot... ⏳');
+    try {
+      const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/health`);
+      if (res.ok) {
+        toast('🟢 Servidor bot activo y respondiendo correctamente');
+      } else {
+        toast(`⚠️ Servidor respondió con código ${res.status}`, true);
+      }
+    } catch (e) {
+      toast(`🔴 Error al conectar: ${e.message}`, true);
+    }
+    updateWaBotStatusUI();
+  });
+
+  const bindWaToggle = (id, key) => {
+    const el = document.querySelector(id);
+    el?.addEventListener('change', () => {
+      const cfg = getWaBotConfig();
+      cfg[key] = el.checked;
+      saveWaBotConfig(cfg);
+      toast('Preferencia de aviso actualizada');
+    });
+  };
+  bindWaToggle('#set-wa-auto-intake', 'autoIntake');
+  bindWaToggle('#set-wa-auto-ready', 'autoReady');
+  bindWaToggle('#set-wa-auto-delivered', 'autoDelivered');
 }
 
 let pendingAuthEmail = '';

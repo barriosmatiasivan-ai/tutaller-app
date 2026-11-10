@@ -445,8 +445,9 @@ html[data-ui="pro"] .sidebar-brand-box {
 }
 html[data-ui="pro"] .sidebar nav .nav-item {
   border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 13.5px;
+  padding: 11px 14px;
+  font-size: 14px;
+  min-height: 42px;
   font-weight: 500;
   color: #8fa69a;
   display: flex;
@@ -527,39 +528,45 @@ html[data-ui="pro"] .bottom-nav .nav-item.active {
    PASO 2: TARJETAS DE MÉTRICAS CON MICRO-BORDES DE LUZ (GLOW KPIs) Y PANELES
    ========================================================================== */
 
-/* Estructura base de tarjeta KPI en Modo Pro (Idéntica a la referencia visual) */
-html[data-ui="pro"] .stat {
+/* Tarjetas KPI unificadas (idénticas dimensiones, altura y padding en Clásica y Pro) */
+.stat {
   position: relative;
   display: flex;
   flex-direction: row-reverse;
   align-items: flex-start;
   justify-content: space-between;
   padding: 20px 22px !important;
+  border: 1px solid var(--border);
   border-radius: 16px !important;
-  min-height: 108px;
+  min-height: 108px !important;
+  background: #ffffff;
+  color: inherit;
+  box-shadow: 0 1px 3px rgba(16, 24, 20, 0.03);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
   overflow: hidden;
+  box-sizing: border-box;
 }
-html[data-ui="pro"] .stat > div {
+.stat > div {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
 }
-html[data-ui="pro"] .stat > div > span {
+.stat > div > span {
   font-size: 13.5px !important;
   font-weight: 500 !important;
-  color: #cbd5e1 !important;
+  color: var(--muted);
   letter-spacing: -0.01em;
 }
-html[data-ui="pro"] .stat strong {
+.stat strong {
+  display: block;
   font-size: 32px !important;
   font-weight: 800 !important;
   line-height: 1 !important;
   letter-spacing: -0.03em;
-  color: #ffffff !important;
+  color: #0f1713;
 }
-html[data-ui="pro"] .stat .stat-icon {
+.stat .stat-icon {
   width: 38px !important;
   height: 38px !important;
   border-radius: 10px !important;
@@ -567,6 +574,33 @@ html[data-ui="pro"] .stat .stat-icon {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: #ecfdf5;
+  font-size: 18px;
+  color: #059669;
+}
+[data-theme="dark"] .stat {
+  background: #141e19;
+  border-color: #233329;
+}
+[data-theme="dark"] .stat strong {
+  color: #ffffff;
+}
+[data-theme="dark"] .stat > div > span {
+  color: #9eb5a7;
+}
+[data-theme="dark"] .stat .stat-icon {
+  background: #0f291e;
+  color: #34d399;
+}
+html[data-ui="pro"] .stat {
+  background: #0e1512 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+html[data-ui="pro"] .stat > div > span {
+  color: #cbd5e1 !important;
+}
+html[data-ui="pro"] .stat strong {
+  color: #ffffff !important;
 }
 
 /* 1. KPI CIAN (En reparación / Mercado Pago) */
@@ -674,16 +708,22 @@ html[data-ui="pro"] .pending-card small {
 }
 
 @media (max-width: 700px) {
-  html[data-ui="pro"] .stat {
-    padding: 14px 16px !important;
-    min-height: 88px;
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
   }
-  html[data-ui="pro"] .stat strong {
+  .stat {
+    padding: 14px 16px !important;
+    min-height: 88px !important;
+  }
+  .stat strong {
     font-size: 24px !important;
   }
-  html[data-ui="pro"] .stat .stat-icon {
+  .stat .stat-icon {
     width: 32px !important;
     height: 32px !important;
+    font-size: 15px !important;
   }
 }
 
@@ -707,17 +747,38 @@ html[data-ui="pro"] .empty-pro-badge {
   box-shadow: 0 0 24px rgba(16, 185, 129, 0.25);
 }
 
-/* Tarjeta/Fila de Orden en Modo Pro (Inspirada en la tabla de la referencia visual) */
-html[data-ui="pro"] .order-card-enhanced {
-  background: rgba(255, 255, 255, 0.025) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+/* Tarjetas de Reparación unificadas (idénticas proporciones en Clásica y Pro) */
+.order-card-enhanced {
+  background: #ffffff;
+  border: 1px solid var(--border);
   border-radius: 14px !important;
   padding: 14px 16px !important;
   margin-bottom: 10px !important;
   gap: 12px 14px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap !important;
-  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   transition: all 0.18s ease !important;
+  box-sizing: border-box;
+}
+.order-card-enhanced:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+[data-theme="dark"] .order-card-enhanced {
+  background: #141e19;
+  border-color: #233329;
+}
+[data-theme="dark"] .order-card-enhanced:hover {
+  background: #18251f;
+  border-color: #2e4437;
+}
+html[data-ui="pro"] .order-card-enhanced {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.35);
 }
 html[data-ui="pro"] .order-card-enhanced:hover {
   background: rgba(255, 255, 255, 0.045) !important;
@@ -727,64 +788,96 @@ html[data-ui="pro"] .order-card-enhanced:hover {
 }
 
 /* ID de orden estilo código (#1084) */
-html[data-ui="pro"] .order-id-pro {
+.order-id-pro {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12.5px;
   font-weight: 700;
-  color: #94a3b8;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #475569;
+  background: #f1f5f2;
+  border: 1px solid var(--border);
   padding: 5px 8px;
   border-radius: 8px;
   letter-spacing: 0.02em;
   flex-shrink: 0;
 }
+[data-theme="dark"] .order-id-pro {
+  background: #1b2620;
+  border-color: #2a3a30;
+  color: #94a3b8;
+}
+html[data-ui="pro"] .order-id-pro {
+  color: #94a3b8 !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
 
-html[data-ui="pro"] .order-card-enhanced .phone-icon {
+.order-card-enhanced .phone-icon,
+.order-card-enhanced .brand-icon {
   background: #ffffff !important;
-  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
   border-radius: 11px !important;
   color: #0f172a !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+html[data-ui="pro"] .order-card-enhanced .phone-icon,
+html[data-ui="pro"] .brand-icon {
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
-html[data-ui="pro"] .order-card-enhanced .order-meta {
+.order-card-enhanced .order-meta {
   min-width: 0 !important;
   flex: 1 1 120px !important;
 }
-html[data-ui="pro"] .order-card-enhanced .order-meta .device-text {
+.order-card-enhanced .order-meta .device-text {
   font-size: 14.5px !important;
   font-weight: 700 !important;
-  color: #ffffff !important;
+  color: inherit;
   letter-spacing: -0.01em;
 }
-html[data-ui="pro"] .order-card-enhanced .order-meta .fault-text {
+html[data-ui="pro"] .order-card-enhanced .order-meta .device-text {
+  color: #ffffff !important;
+}
+.order-card-enhanced .order-meta .fault-text {
   font-size: 12.5px !important;
-  color: #94a3b8 !important;
+  color: var(--muted) !important;
   max-width: 100% !important;
 }
+html[data-ui="pro"] .order-card-enhanced .order-meta .fault-text {
+  color: #94a3b8 !important;
+}
 
-/* Columna Cliente con Avatar Circular de Iniciales en Modo Pro */
-html[data-ui="pro"] .order-client-pro {
+/* Columna Cliente con Avatar Circular de Iniciales */
+.order-client-pro {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
-.client-avatar-pro,
-html[data-ui="pro"] .client-row .avatar {
+.client-avatar-pro {
   width: 34px;
   height: 34px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.2) 100%) !important;
-  border: 1px solid rgba(52, 211, 153, 0.45) !important;
-  color: #6ee7b7 !important;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
   font-size: 12px;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+[data-theme="dark"] .client-avatar-pro {
+  background: #0f291e;
+  border-color: #10b981;
+  color: #34d399;
+}
+html[data-ui="pro"] .client-avatar-pro,
+html[data-ui="pro"] .client-row .avatar {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.2) 100%) !important;
+  border: 1px solid rgba(52, 211, 153, 0.45) !important;
+  color: #6ee7b7 !important;
   box-shadow: 0 0 14px rgba(16, 185, 129, 0.2);
 }
 .client-info-pro {
@@ -796,16 +889,22 @@ html[data-ui="pro"] .client-row .avatar {
 .client-info-pro strong {
   font-size: 13px;
   font-weight: 600;
-  color: #f1f5f9;
+  color: inherit;
   line-height: 1.2;
+}
+html[data-ui="pro"] .client-info-pro strong {
+  color: #f1f5f9 !important;
 }
 .client-info-pro span {
   font-size: 11px;
-  color: #64748b;
+  color: var(--muted);
+}
+html[data-ui="pro"] .client-info-pro span {
+  color: #64748b !important;
 }
 
 /* Contenedor de Línea de Progreso Visual (Stepper 3 Pasos) en barra inferior de la tarjeta */
-html[data-ui="pro"] .order-stepper-wrap {
+.order-stepper-wrap {
   width: 100%;
   display: flex;
   flex-direction: row;
@@ -814,8 +913,14 @@ html[data-ui="pro"] .order-stepper-wrap {
   gap: 10px;
   padding-top: 10px;
   margin-top: 2px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border);
   flex-wrap: wrap;
+}
+[data-theme="dark"] .order-stepper-wrap {
+  border-top-color: #233329;
+}
+html[data-ui="pro"] .order-stepper-wrap {
+  border-top-color: rgba(255, 255, 255, 0.06) !important;
 }
 .order-stepper-right {
   display: inline-flex;
@@ -914,26 +1019,26 @@ html[data-ui="pro"] .stock-card:hover {
 }
 
 @media (max-width: 980px) {
-  html[data-ui="pro"] .order-card-enhanced {
+  .order-card-enhanced {
     flex-wrap: wrap;
     padding: 12px 14px !important;
     gap: 10px !important;
   }
-  html[data-ui="pro"] .order-card-enhanced .order-meta {
+  .order-card-enhanced .order-meta {
     flex: 1 1 140px !important;
   }
-  html[data-ui="pro"] .order-client-pro {
+  .order-client-pro {
     min-width: 0 !important;
     flex: 1 1 auto;
   }
-  html[data-ui="pro"] .order-actions-btns {
+  .order-actions-btns {
     margin-left: auto;
     width: auto !important;
     border-top: none !important;
     padding-top: 0 !important;
     margin-top: 0 !important;
   }
-  html[data-ui="pro"] .order-stepper-wrap {
+  .order-stepper-wrap {
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -941,7 +1046,13 @@ html[data-ui="pro"] .stock-card:hover {
     gap: 8px;
     margin-top: 4px;
     padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--border);
+  }
+  [data-theme="dark"] .order-stepper-wrap {
+    border-top-color: #233329;
+  }
+  html[data-ui="pro"] .order-stepper-wrap {
+    border-top-color: rgba(255, 255, 255, 0.06) !important;
   }
   .order-stepper {
     display: flex;
@@ -978,22 +1089,42 @@ html[data-ui="pro"] .stock-card:hover {
    PASO 4: BOTÓN WHATSAPP ESMERALDA, QR VECTORIAL Y VENTANAS GLASSMORPHISM
    ========================================================================== */
 
-html[data-ui="pro"] .order-actions-btns {
+.order-actions-btns {
+  display: inline-flex;
+  align-items: center;
   gap: 8px !important;
 }
 
-html[data-ui="pro"] .btn-wa-action {
+.btn-wa-action {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
   width: auto !important;
   height: 32px !important;
   padding: 0 12px !important;
   border-radius: 9px !important;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  text-decoration: none !important;
+  transition: all 0.18s ease !important;
+}
+.btn-wa-action:hover {
+  background: #d1fae5;
+  border-color: #059669;
+}
+[data-theme="dark"] .btn-wa-action {
+  background: #0f291e;
+  border-color: #1a4231;
+  color: #34d399;
+}
+html[data-ui="pro"] .btn-wa-action {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.18) 100%) !important;
   border: 1px solid rgba(52, 211, 153, 0.5) !important;
   color: #34d399 !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
   box-shadow: 0 0 14px -2px rgba(16, 185, 129, 0.28);
-  transition: all 0.18s ease !important;
 }
 html[data-ui="pro"] .btn-wa-action:hover {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
@@ -1002,20 +1133,37 @@ html[data-ui="pro"] .btn-wa-action:hover {
   box-shadow: 0 4px 18px rgba(16, 185, 129, 0.45);
   transform: translateY(-1px);
 }
-html[data-ui="pro"] .wa-pro-content {
+.wa-pro-content {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-html[data-ui="pro"] .btn-qr-action {
+.btn-qr-action {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
   width: 32px !important;
   height: 32px !important;
   border-radius: 9px !important;
+  background: #f1f5f2;
+  border: 1px solid var(--border);
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.18s ease !important;
+}
+.btn-qr-action:hover {
+  background: #e5e7eb;
+}
+[data-theme="dark"] .btn-qr-action {
+  background: #1b2620;
+  border-color: #2a3a30;
+  color: #cbd5e1;
+}
+html[data-ui="pro"] .btn-qr-action {
   background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   color: #cbd5e1 !important;
-  transition: all 0.18s ease !important;
 }
 html[data-ui="pro"] .btn-qr-action:hover {
   background: rgba(6, 182, 212, 0.15) !important;

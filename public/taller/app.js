@@ -479,48 +479,36 @@ function orderCardHtml(order) {
 
   return `
     <div class="order-card-enhanced" data-order-id="${order.id}">
-      <span class="order-id-pro icon-pro">#${order.order_number}</span>
+      <span class="order-id-pro">#${order.order_number}</span>
       ${brandBadge(order.brand)}
       <div class="order-meta">
-        <strong class="icon-classic">
-          <span class="muted small">#${order.order_number}</span>
-          <span>${esc(clientName)}${clientPhone}</span>
-        </strong>
         <span class="device-text">${esc(order.brand)} ${esc(order.model)}</span>
         <span class="fault-text">${esc(order.fault || 'Revisión técnica')}</span>
       </div>
-      <div class="order-client-pro icon-pro">
+      <div class="order-client-pro">
         <span class="client-avatar-pro">${esc(initials)}</span>
         <div class="client-info-pro">
           <strong>${esc(clientName)}</strong>
           <span>${esc(order.client_phone || 'Sin teléfono')}</span>
         </div>
       </div>
-      <div class="icon-classic" style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
-        <span class="badge ${st.class}"><span class="dot"></span>${st.label}</span>
-        ${financeBadgeHtml}
-      </div>
       <div class="order-actions-btns" onclick="event.stopPropagation();">
         ${order.client_phone ? `
           <a class="order-action-icon btn-wa-action" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}, te escribimos de ${currentWorkshop?.name || 'el taller'} sobre tu orden #${order.order_number} (${order.brand} ${order.model}): estado actual: ${st.label}.`)}" target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp al cliente">
-            <span class="icon-classic">💬</span>
-            <span class="icon-pro wa-pro-content">
+            <span class="wa-pro-content">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
               <span>WhatsApp</span>
             </span>
           </a>
         ` : ''}
         <a class="order-action-icon btn-qr-action" href="${trackingUrl}" target="_blank" rel="noopener noreferrer" title="Ver comprobante y QR de seguimiento">
-          <span class="icon-classic">📲</span>
-          <span class="icon-pro">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          </span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         </a>
       </div>
-      <span class="chevron icon-classic" style="margin-left:6px;">›</span>
-      <div class="order-stepper-wrap icon-pro">
+      <div class="order-stepper-wrap">
         ${renderOrderStepper(order.status)}
         <div class="order-stepper-right">
+          <span class="badge ${st.class}"><span class="dot"></span>${st.label}</span>
           ${financeBadgeHtml}
         </div>
       </div>

@@ -179,6 +179,13 @@ select {
   padding: 9px 12px;
   font-size: 13px;
   cursor: pointer;
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  background-color: var(--bg-card, #141f1c) !important;
+  color: var(--text-main, #f3f4f6) !important;
 }
 
 select:focus {

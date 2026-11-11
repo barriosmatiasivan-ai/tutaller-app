@@ -65,7 +65,12 @@
 .brand-icon{width:44px;height:44px;padding:5px;background:#fff;border:1px solid var(--border);border-radius:10px}.brand-icon img{display:block;width:100%;height:100%;object-fit:contain}.brand-icon svg{width:24px;height:30px}.brand-icon img+svg{display:none}.pending-order-text{flex:1;min-width:0;overflow-wrap:anywhere}[data-pending-order]{gap:12px}@media(max-width:700px){.order-card .brand-icon{width:44px;height:46px}}
 
 :root[data-theme="dark"]{color:#e4efe8;background:#0b120e;--muted:#8ca395;--border:#223329;color-scheme:dark}
-[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:#101a14;border-color:#293d31;color:#e4efe8}
+[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:#101a14;border-color:#293d31;color:#e4efe8;color-scheme:dark}
+select,select option,select optgroup{color-scheme:dark}
+[data-theme="dark"] select option,[data-theme="dark"] select optgroup,select option,select optgroup{background-color:#101a14!important;color:#e4efe8!important}
+select option:checked,select option:hover{background-color:#059669!important;color:#ffffff!important}
+[data-theme="light"] select{color-scheme:light}
+[data-theme="light"] select option,[data-theme="light"] select optgroup{background-color:#ffffff!important;color:#0f172a!important}
 [data-theme="dark"] input::placeholder,[data-theme="dark"] textarea::placeholder{color:#6c8576}
 [data-theme="dark"] .secondary{background:#18251e;border-color:#293d31;color:#d8e8de}
 [data-theme="dark"] .secondary:hover{background:#213329;border-color:#385243}
@@ -1214,6 +1219,13 @@ html[data-ui="pro"] .section-toolbar select {
   border-radius: 10px !important;
   color: #f8fafc !important;
   transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
+  color-scheme: dark !important;
+}
+html[data-ui="pro"] dialog.custom-dialog select option,
+html[data-ui="pro"] .section-toolbar select option,
+dialog.custom-dialog select option {
+  background-color: #101a14 !important;
+  color: #f8fafc !important;
 }
 html[data-ui="pro"] dialog.custom-dialog input:not([type="checkbox"]):focus,
 html[data-ui="pro"] dialog.custom-dialog select:focus,

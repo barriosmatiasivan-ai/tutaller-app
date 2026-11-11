@@ -112,10 +112,164 @@ async function initWhatsApp() {
         }
       }
     });
+
+    // -------------------------------------------------------------
+    // Auto-Respondedor y Chatbot para Mensajes Entrantes de Clientes
+    // -------------------------------------------------------------
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      try {
+        if (type !== 'notify') return;
+
+        for (const m of messages) {
+          if (!m.message) continue;
+          const jid = m.key.remoteJid;
+          if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
+
+          // Si el mensaje lo envió el dueño (desde el celular o WhatsApp Web):
+          if (m.key.fromMe) {
+            // Pausa el bot para este contacto durante 2 horas para no interrumpir la atención humana
+            chatStates.set(jid, { ...(chatStates.get(jid) || {}), pausedUntil: Date.now() + 2 * 3600 * 1000 });
+            logger.info({ jid }, 'El dueño respondió en el chat. Bot pausado por 2 horas para este contacto.');
+            continue;
+          }
+
+          // Verificar si el chat está pausado por atención humana
+          const chatState = chatStates.get(jid) || {};
+          const now = Date.now();
+          if (chatState.pausedUntil && chatState.pausedUntil > now) {
+            continue;
+          }
+
+          // Extraer texto del mensaje
+          const text = (
+            m.message.conversation ||
+            m.message.extendedTextMessage?.text ||
+            m.message.imageMessage?.caption ||
+            ''
+          ).trim();
+
+          // Evitar responder spam repetitivo en menos de 6 minutos salvo comandos directos
+          const isCommand = /^(1|2|3|precio|precios|demo|sistema|orden|#|horario|ubicacion|humano)/i.test(text);
+          if (chatState.lastReplied && (now - chatState.lastReplied < 6 * 60 * 1000) && !isCommand) {
+            continue;
+          }
+
+          const rawReply = generateBotReply(text, m);
+          if (rawReply) {
+            const isHandoff = rawReply.includes('[[HUMANO]]');
+            const cleanReply = rawReply.replace(/\[\[HUMANO\]\]/g, '').trim();
+
+            try {
+              await sock.sendPresenceUpdate('composing', jid).catch(() => {});
+              await new Promise(r => setTimeout(r, 1200));
+              await sock.sendMessage(jid, { text: cleanReply });
+              await sock.sendPresenceUpdate('paused', jid).catch(() => {});
+
+              chatStates.set(jid, {
+                ...chatState,
+                lastReplied: now,
+                pausedUntil: isHandoff ? (now + 2 * 3600 * 1000) : 0
+              });
+              logger.info({ jid, preview: cleanReply.slice(0, 35) }, '✅ Respuesta automática enviada');
+            } catch (sendErr) {
+              logger.error({ sendErr, jid }, 'Error enviando respuesta automática por WhatsApp');
+            }
+          }
+        }
+      } catch (upsertErr) {
+        logger.error({ upsertErr }, 'Error en listener messages.upsert');
+      }
+    });
   } catch (err) {
     logger.error({ err }, 'Error crítico inicializando WhatsApp Baileys');
     connectionState = 'disconnected';
   }
+}
+
+// Estado en memoria para conversaciones y cooldown
+const chatStates = new Map();
+
+function generateBotReply(rawText, messageObj) {
+  const t = (rawText || '').toLowerCase().trim();
+
+  // Si mandó solo un audio o una imagen sin texto
+  if (!t && (messageObj?.message?.audioMessage || messageObj?.message?.imageMessage)) {
+    return `¡Hola! 👋 Recibimos tu mensaje. En breve Matías o el equipo técnico te responde por este mismo chat en cuanto se desocupe del banco de trabajo. [[HUMANO]]`;
+  }
+
+  // 1. Consultas sobre el software TuTaller / Demo / Precios del sistema
+  if (
+    t.includes('tutaller') ||
+    t.includes('sistema') ||
+    t.includes('software') ||
+    t.includes('programa') ||
+    t.includes('demo') ||
+    t.includes('probar') ||
+    t === '1'
+  ) {
+    if (t.includes('precio') || t.includes('cuanto') || t.includes('sale') || t.includes('costo') || t.includes('plan')) {
+      return `¡Hola! 🔧 Los planes de *TuTaller Soft* son fijos y sin sorpresas:\n\n⭐ *Plan Mensual:* $15.000 / mes (sin contrato de permanencia).\n👑 *Pase Vitalicio Fundador:* $110.000 (único pago de por vida, cupos limitados).\n\nAmbos incluyen módulo de WhatsApp, órdenes con fotos y control de caja/stock.\n\n👉 Podés probar la *Demo gratuita de 48hs* acá:\nhttps://demo.tutallersoft.com\n\n¿Querés que te activemos tu taller de prueba?`;
+    }
+    return `¡Hola! 👋 *TuTaller Soft* es el sistema en la nube diseñado para talleres de celulares y electrónica:\n\n✅ Órdenes de reparación con fotos y seguimiento en vivo por QR.\n✅ Avisos automáticos de WhatsApp cuando el equipo está listo.\n✅ Control de caja, deudas de clientes, repuestos y compras.\n\n👉 Probá la *Demo interactiva de 48hs* gratis (sin tarjeta):\nhttps://demo.tutallersoft.com\n\nSi querés activar tu taller de prueba o conocer los planes, avisanos por acá.`;
+  }
+
+  // 2. Precios generales
+  if (t === 'precio' || t === 'precios' || t.includes('cuanto cuesta el sistema') || t.includes('cuanto sale el sistema')) {
+    return `Planes disponibles de *TuTaller Soft*:\n\n⭐ *Plan Mensual:* $15.000 / mes (sin contratos ni permanencia).\n👑 *Pase Vitalicio:* $110.000 (un solo pago de por vida).\n\n👉 Para probar cómo funciona en vivo:\nhttps://demo.tutallersoft.com`;
+  }
+
+  // 3. Consultas sobre reparación de celular / presupuesto técnico
+  if (
+    t.includes('repar') ||
+    t.includes('pantalla') ||
+    t.includes('modulo') ||
+    t.includes('módulo') ||
+    t.includes('bateria') ||
+    t.includes('batería') ||
+    t.includes('tapa') ||
+    t.includes('pin de carga') ||
+    t.includes('no prende') ||
+    t.includes('presupuesto') ||
+    t.includes('arregl') ||
+    t.includes('vidrio') ||
+    t.includes('camara') ||
+    t.includes('cámara') ||
+    t.includes('celular') ||
+    t.includes('telefono') ||
+    t.includes('teléfono') ||
+    t === '2'
+  ) {
+    return `¡Hola! 📱 Para pasarte el presupuesto exacto de la reparación, por favor indicanos:\n\n1️⃣ *Marca y modelo exacto* (ej: Samsung A32, iPhone 11, Moto G22)\n2️⃣ *Qué problema tiene* (pantalla rota, no carga, no da imagen, etc.)\n\nEn breve te confirmamos costo de repuesto y tiempo estimado de entrega. [[HUMANO]]`;
+  }
+
+  // 4. Consulta de estado de orden / reparación en curso
+  if (
+    t.includes('orden') ||
+    t.includes('#') ||
+    t.includes('seguimiento') ||
+    t.includes('estado') ||
+    t.includes('como va') ||
+    t.includes('como viene') ||
+    t.includes('esta listo') ||
+    t.includes('está listo') ||
+    t.includes('retiro') ||
+    t === '3'
+  ) {
+    return `¡Hola! 🔍 Podés consultar el estado de tu equipo en tiempo real desde tu enlace de seguimiento:\nhttps://app.tutallersoft.com/seguimiento/\n\nO pasanos por acá tu *número de orden* o nombre con el que ingresó el celular y te decimos cómo va.`;
+  }
+
+  // 5. Horarios y atención
+  if (t.includes('horario') || t.includes('horarios') || t.includes('abierto') || t.includes('cuando abren') || t.includes('direccion') || t.includes('dirección') || t.includes('ubicacion') || t.includes('ubicación')) {
+    return `📍 *Horarios de atención:*\nLunes a viernes de 9:00 a 18:00 hs.\n\n¿En qué podemos ayudarte hoy?`;
+  }
+
+  // 6. Pedido de atención humana directa
+  if (t.includes('humano') || t.includes('persona') || t.includes('asesor') || t.includes('matias') || t.includes('matías') || t.includes('hablar con')) {
+    return `¡Perfecto! 👋 Le dejamos aviso a Matías para que te responda directamente por este chat en cuanto se desocupe del banco de trabajo. [[HUMANO]]`;
+  }
+
+  // 7. Saludo por defecto / Menú inicial
+  return `¡Hola! 👋 Te damos la bienvenida a *Tu Taller*.\n\n¿En qué podemos ayudarte hoy?\n\n1️⃣ *Software TuTaller Soft:* si sos técnico o dueño de taller y querés ver el sistema de gestión.\n2️⃣ *Reparación de celulares:* si necesitás presupuesto para arreglar un equipo.\n3️⃣ *Estado de orden:* si ya dejaste un equipo en el taller y querés consultar el estado.\n\nEscribinos tu consulta y te respondemos a la brevedad.`;
 }
 
 // Normalizador de teléfono argentino e internacional

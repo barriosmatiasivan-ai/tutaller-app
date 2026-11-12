@@ -19,6 +19,6 @@ npm run preview
 npm run deploy
 ```
 
-El worker publicado se mantiene en `public/_worker.js`. Aplicar las migraciones D1 pendientes antes de publicar con `wrangler d1 migrations apply tutallersoft-d1 --remote`. Verificar el portal, administración, una ruta de taller, el JavaScript y una orden con foto en el taller de prueba.
+El worker publicado se mantiene en `public/_worker.js`. Aplicar las migraciones D1 pendientes antes de publicar con `npx wrangler d1 migrations apply DB --config wrangler.migrations.json --remote`. Verificar el portal, administración, una ruta de taller, el JavaScript y una orden con foto en el taller de prueba.
 
 Cloudflare Access utiliza `CF_ACCESS_ISSUER` (URL del equipo) y `CF_ACCESS_AUD` (audiencia de la aplicación). El login de administrador por sesión sigue disponible. Para el bot, configurar `BOT_URL` en Pages y el mismo secreto `BOT_ADMIN_KEY` en Pages y Railway. Reservar `BOT_API_KEY` para envío. Los secretos se configuran en los proveedores.

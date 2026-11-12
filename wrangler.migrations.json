@@ -1,0 +1,11 @@
+{
+  "name": "tutaller-app",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tutallersoft-d1",
+      "database_id": "155d893b-3b29-40d0-ad5e-55a070bb031f",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

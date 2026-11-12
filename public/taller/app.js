@@ -175,6 +175,57 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function uploadOrderPhotos(orderId, files) {
+  const formData = new FormData();
+  files.forEach(file => formData.append('photos', file));
+  const token = getWorkshopToken();
+  const res = await fetch(`/api/workshop/${currentSlug}/orders/${encodeURIComponent(orderId)}/photos`, {
+    method: 'POST',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    body: formData
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    clearWorkshopToken();
+    showWorkshopLogin();
+  }
+  if (!res.ok) throw new Error(data.error || 'No se pudieron cargar las fotos');
+  return data;
+}
+
+async function renderOrderPhotoGallery(orderId, gallery) {
+  if (!gallery) return;
+  gallery.innerHTML = '<p class="muted">Cargando fotos…</p>';
+  try {
+    const result = await api(`/api/workshop/${currentSlug}/orders/${encodeURIComponent(orderId)}/photos`);
+    const photos = result.photos || [];
+    if (!photos.length) {
+      gallery.innerHTML = '<p class="muted">Todavía no hay fotos guardadas para este equipo.</p>';
+      return;
+    }
+    gallery.innerHTML = photos.map(photo => `
+      <figure style="margin:0;">
+        <img data-photo-id="${esc(photo.id)}" alt="${esc(photo.file_name || 'Foto del equipo')}"
+          style="width:120px;height:100px;object-fit:cover;border-radius:10px;border:1px solid var(--border);">
+        <figcaption class="muted" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">${esc(photo.file_name || 'Foto del equipo')}</figcaption>
+      </figure>
+    `).join('');
+    const token = getWorkshopToken();
+    await Promise.all(photos.map(async photo => {
+      const response = await fetch(`/api/workshop/${currentSlug}/orders/${encodeURIComponent(orderId)}/photos/${encodeURIComponent(photo.id)}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error('No se pudo mostrar una foto');
+      const imageUrl = URL.createObjectURL(await response.blob());
+      const img = gallery.querySelector(`img[data-photo-id="${CSS.escape(photo.id)}"]`);
+      if (img) img.src = imageUrl;
+      else URL.revokeObjectURL(imageUrl);
+    }));
+  } catch (err) {
+    gallery.innerHTML = `<p class="muted">No se pudieron cargar las fotos: ${esc(err.message)}</p>`;
+  }
+}
+
 function modal(title, content) {
   const d = document.querySelector('#app-modal');
   if (!d) return null;
@@ -811,6 +862,14 @@ function openOrderDetailModal(order) {
         <dt>IMEI / Serie</dt><dd>${esc(order.identifier || 'No especificado')}</dd>
       </dl>
 
+      <section style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+        <label for="order-photo-input">Fotos del equipo</label>
+        <p class="muted" style="margin:4px 0 10px;font-size:12px;">Agregá imágenes al recibirlo o durante la reparación.</p>
+        <input id="order-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple>
+        <small class="muted">Hasta 6 imágenes por carga, máx. 8 MB cada una.</small>
+        <div id="order-photo-gallery" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;"></div>
+      </section>
+
       <form id="order-status-form" style="margin-top:16px;">
         <label>Cambiar estado de reparación
           <select id="edit-order-status" style="margin-top:6px;">
@@ -844,6 +903,24 @@ function openOrderDetailModal(order) {
   `);
 
   if (!d) return;
+
+  const photoGallery = d.querySelector('#order-photo-gallery');
+  renderOrderPhotoGallery(order.id, photoGallery);
+  d.querySelector('#order-photo-input')?.addEventListener('change', async event => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    event.target.disabled = true;
+    try {
+      const result = await uploadOrderPhotos(order.id, files);
+      toast(`${result.uploaded} foto(s) guardada(s) en la orden #${order.order_number}`);
+      await renderOrderPhotoGallery(order.id, photoGallery);
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      event.target.value = '';
+      event.target.disabled = false;
+    }
+  });
 
   d.querySelector('#btn-modal-send-wa-bot')?.addEventListener('click', async () => {
     const currentSt = d.querySelector('#edit-order-status')?.value || order.status;
@@ -1071,6 +1148,10 @@ function openNewOrderModal() {
       <label class="wide">Estado físico al recibir
         <input name="condition" placeholder="Ej: Rayones en tapa, vidrio astillado...">
       </label>
+      <label class="wide">Fotos del equipo al recibir
+        <input id="intake-photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple>
+        <small class="muted">Podés cargar hasta 6 imágenes (máx. 8 MB cada una).</small>
+      </label>
       <label class="wide">Accesorios entregados
         <input name="accessories" placeholder="Ej: Con funda y chip, sin cargador">
       </label>
@@ -1110,6 +1191,8 @@ function openNewOrderModal() {
     if (btn) btn.disabled = true;
     const fd = new FormData(e.target);
     const payload = Object.fromEntries(fd);
+    const intakePhotos = fd.getAll('photos').filter(file => file instanceof File && file.size > 0);
+    delete payload.photos;
 
     try {
       const res = await api(`/api/workshop/${currentSlug}/orders`, {
@@ -1117,6 +1200,14 @@ function openNewOrderModal() {
         body: JSON.stringify(payload)
       });
       toast(`¡Orden #${res.order_number} ingresada con éxito!`);
+      if (intakePhotos.length) {
+        try {
+          await uploadOrderPhotos(res.id, intakePhotos);
+          toast(`Fotos guardadas en la orden #${res.order_number}`);
+        } catch (photoErr) {
+          toast(`La orden se creó, pero no se pudieron guardar las fotos: ${photoErr.message}`, true);
+        }
+      }
       d.close();
 
       let clientPhone = payload.client_phone || '';

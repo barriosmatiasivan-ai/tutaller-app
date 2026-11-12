@@ -295,10 +295,17 @@ function formatWhatsAppJid(phone) {
 }
 
 // Middleware de autenticación opcional por API Key
+function adminMiddleware(req, res, next) {
+  const key = process.env.BOT_ADMIN_KEY;
+  if (!key) return res.status(503).json({error:'Administración no configurada'});
+  if (req.get('Authorization') !== 'Bearer ' + key) return res.sendStatus(401);
+  next();
+}
+
 function authMiddleware(req, res, next) {
-  if (!API_KEY) return next();
+  if (!API_KEY) return res.status(503).json({error:'Bot no configurado'});
   const bearer = req.headers['authorization']?.replace(/^Bearer\s+/i, '');
-  const provided = req.headers['x-api-key'] || bearer || req.query.api_key;
+  const provided = req.headers['x-api-key'] || bearer;
   if (!provided || provided !== API_KEY) {
     return res.status(401).json({ error: 'No autorizado. Clave de acceso inválida.' });
   }
@@ -328,7 +335,7 @@ app.get('/api/status', (req, res) => {
 });
 
 // 3. Obtener el código QR en Base64 o vista web para escanear
-app.get('/api/qr', (req, res) => {
+app.get('/api/qr', adminMiddleware, (req, res) => {
   const wantsJson = req.headers.accept?.includes('application/json') || req.query.format === 'json';
 
   if (wantsJson) {
@@ -440,7 +447,7 @@ app.post('/api/send', authMiddleware, async (req, res) => {
 });
 
 // 5. Desvincular / Cerrar sesión
-app.post('/api/disconnect', authMiddleware, async (req, res) => {
+app.post('/api/disconnect', adminMiddleware, async (req, res) => {
   try {
     logger.info('Desconectando WhatsApp a petición del usuario...');
     if (sock) {

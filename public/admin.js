@@ -678,11 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fetchQr = async () => {
       try {
-        const res = await fetch(`${url.replace(/\/+$/, '')}/api/qr?format=json`, {
-          headers: { 'Accept': 'application/json' }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const data = await api('/api/admin/bot/qr');
 
         if (data.connected) {
           if (waQrLoading) waQrLoading.style.display = 'none';
@@ -718,8 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const url = getAdminWaUrl();
     if (!confirm('¿Seguro que deseás desvincular la línea de WhatsApp?')) return;
     try {
-      const res = await fetch(`${url.replace(/\/+$/, '')}/api/disconnect`, { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await api('/api/admin/bot/disconnect',{method:'POST'});
       toast('WhatsApp desvinculado con éxito');
       waQrModal?.close();
     } catch (err) {

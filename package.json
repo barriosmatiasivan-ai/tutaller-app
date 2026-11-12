@@ -5,6 +5,13 @@
   "type": "module",
   "description": "Tu Taller Soft — Plataforma SaaS Multi-Tenant y Panel Super-Admin",
   "scripts": {
-    "deploy": "npx wrangler pages deploy public --project-name tutaller-app --branch main"
+    "deploy": "wrangler pages deploy public --project-name tutaller-app --branch main",
+    "preview": "wrangler pages deploy public --project-name tutaller-app --branch release-check"
+  },
+  "dependencies": {
+    "jose": "6.2.17"
+  },
+  "devDependencies": {
+    "wrangler": "4.161.0"
   }
 }

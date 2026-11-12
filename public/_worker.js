@@ -1,3 +1,19 @@
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+
+const accessKeys = new Map();
+async function verifiedAccessEmail(request, env) {
+  const assertion = request.headers.get('Cf-Access-Jwt-Assertion');
+  if (!assertion || !env.CF_ACCESS_ISSUER || !env.CF_ACCESS_AUD) return null;
+  const issuer = env.CF_ACCESS_ISSUER.replace(/\/$/, '');
+  try {
+    if (!accessKeys.has(issuer)) accessKeys.set(issuer, createRemoteJWKSet(new URL(issuer + '/cdn-cgi/access/certs')));
+    const { payload } = await jwtVerify(assertion, accessKeys.get(issuer), {
+      issuer, audience: env.CF_ACCESS_AUD, algorithms: ['RS256'], requiredClaims: ['exp', 'email']
+    });
+    return typeof payload.email === 'string' ? payload.email : null;
+  } catch { return null; }
+}
+
 // Worker para Tu Taller Soft (app.tutallersoft.com)
 // Manejo de Multi-Tenant, API Super-Admin y Seguridad
 
@@ -30,7 +46,7 @@ async function getAdminFromSession(request, env) {
   if (!db) return null;
 
   // 1. Cloudflare Access header
-  const cfEmail = request.headers.get('cf-access-authenticated-user-email');
+  const cfEmail = await verifiedAccessEmail(request, env);
   if (cfEmail) {
     const row = await db.prepare('SELECT email, name FROM super_admins WHERE email = ?').bind(cfEmail.toLowerCase()).first();
     if (row) return row;
@@ -71,6 +87,7 @@ async function ensureAuthSchema(db) {
         code TEXT NOT NULL,
         expires_at TEXT NOT NULL,
         used INTEGER DEFAULT 0,
+        attempts INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )
     `).run();
@@ -112,10 +129,7 @@ async function ensureOrderPhotosSchema(db) {
 
 async function sendResendPinEmail(toEmail, pinCode, workshopName, env) {
   const apiKey = env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.log(`[AUTH PIN] Resend API key pendiente en env. Código para ${toEmail} (${workshopName}): ${pinCode}`);
-    return { success: true, simulated: true };
-  }
+  if (!apiKey) return { success: false };
 
   const emailHtml = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1110; color: #f1f5f9; padding: 40px 20px; text-align: center;">
@@ -303,6 +317,18 @@ export default {
         const newHash = await hashPassword(newPassword);
         await db.prepare('UPDATE super_admins SET password_hash = ? WHERE email = ?').bind(newHash, currentAdmin.email).run();
         return json({ success: true });
+      }
+
+      const botRoute = url.pathname.match(/^\/api\/admin\/bot\/(qr|disconnect)$/);
+      if (botRoute) {
+        if (!env.BOT_ADMIN_KEY || !env.BOT_URL) return json({error:'Configurá el bot de administración.'},503);
+        const action = botRoute[1];
+        if (request.method !== (action === 'qr' ? 'GET' : 'POST')) return json({error:'Método inválido'},405);
+        const upstream = new URL('/api/' + action, env.BOT_URL);
+        if (upstream.protocol !== 'https:') return json({error:'El bot requiere HTTPS'},503);
+        upstream.searchParams.set('format','json');
+        const response = await fetch(upstream, {method:request.method, redirect:'error', headers:{Authorization:'Bearer '+env.BOT_ADMIN_KEY,Accept:'application/json'}});
+        return new Response(response.body,{status:response.status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
       }
 
       // 1. Métricas generales
@@ -567,7 +593,7 @@ export default {
       const token = decodeURIComponent(url.pathname.replace('/api/tracking/', '')).trim();
       const db = env.DB;
       const order = await db.prepare(`
-        SELECT o.*, w.name as workshop_name, w.phone as workshop_phone
+        SELECT o.order_number, o.brand, o.model, o.status, o.fault, o.created_at, o.public_diagnosis AS diagnosis, w.name as workshop_name, w.phone as workshop_phone
         FROM repair_orders o
         JOIN workshops w ON o.workshop_id = w.id
         WHERE o.id = ? OR o.intake_key = ?
@@ -651,7 +677,11 @@ export default {
         }
 
         // Generar PIN de 6 dígitos
-        const pinCode = String(Math.floor(100000 + Math.random() * 900000));
+        if (!env.RESEND_API_KEY) return json({ error: 'Correo de acceso no disponible.' }, 503);
+        const since = new Date(Date.now() - 15 * 60000).toISOString();
+        const recent = await db.prepare('SELECT COUNT(*) AS n FROM workshop_login_codes WHERE workshop_id=? AND email=? AND created_at>?').bind(workshop.id, email, since).first();
+        if (recent.n >= 3) return json({ error: 'Esperá antes de pedir otro código.' }, 429);
+        const pinCode = String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);
         const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
         const codeId = crypto.randomUUID();
         const nowIso = new Date().toISOString();
@@ -661,13 +691,12 @@ export default {
           VALUES (?, ?, ?, ?, ?, 0, ?)
         `).bind(codeId, workshop.id, email, pinCode, expiresAt, nowIso).run();
 
-        await sendResendPinEmail(email, pinCode, workshop.name, env);
-
-        return json({
-          success: true,
-          message: 'Código de acceso enviado a tu correo.',
-          ...(env.RESEND_API_KEY ? {} : { dev_pin: pinCode })
-        });
+        const sent = await sendResendPinEmail(email, pinCode, workshop.name, env);
+        if (!sent.success) {
+          await db.prepare('DELETE FROM workshop_login_codes WHERE id=?').bind(codeId).run();
+          return json({ error: 'No se pudo enviar el código. Intentá nuevamente.' }, 503);
+        }
+        return json({ success: true, message: 'Código de acceso enviado a tu correo.' });
       }
 
       // 3. Auth: Validar PIN de acceso
@@ -682,12 +711,11 @@ export default {
 
         const nowIso = new Date().toISOString();
         const validCode = await db.prepare(`
-          SELECT id FROM workshop_login_codes 
-          WHERE workshop_id = ? AND email = ? AND code = ? AND used = 0 AND expires_at > ?
-          ORDER BY created_at DESC
-        `).bind(workshop.id, email, code, nowIso).first();
-
-        if (!validCode) {
+          UPDATE workshop_login_codes SET attempts=attempts+1, used=CASE WHEN code=? THEN 1 ELSE used END
+          WHERE id=(SELECT id FROM workshop_login_codes WHERE workshop_id=? AND email=? ORDER BY created_at DESC LIMIT 1)
+            AND expires_at>? AND used=0 AND attempts<5 RETURNING used
+        `).bind(code, workshop.id, email, nowIso).first();
+        if (!validCode?.used) {
           return json({ error: 'Código inválido o expirado. Solicitá uno nuevo.' }, 400);
         }
 
@@ -703,7 +731,7 @@ export default {
         }
 
         // Marcar como usado
-        await db.prepare('UPDATE workshop_login_codes SET used = 1 WHERE id = ?').bind(validCode.id).run();
+
 
         // Crear sesión de 30 días
         const userRole = isOwner ? 'owner' : (registeredUser?.role || 'technician');
@@ -800,6 +828,11 @@ export default {
           }
           const currentCount = await db.prepare('SELECT COUNT(*) as count FROM repair_order_photos WHERE order_id = ? AND workshop_id = ?')
             .bind(orderId, workshop.id).first();
+          const uploadId = form.get('upload_id');
+          if (uploadId && (files.length !== 1 || !/^[a-f0-9-]{36}$/i.test(uploadId))) return json({error:'Carga inválida'},400);
+          const savedPhoto = () => db.prepare('SELECT id, file_name FROM repair_order_photos WHERE workshop_id=? AND order_id=? AND id=?').bind(workshop.id,orderId,uploadId).first();
+          const previous = uploadId && await savedPhoto();
+          if (previous) return json({uploaded:1, photos:[previous]});
           if ((currentCount?.count || 0) + files.length > 24) {
             return json({ error: 'La orden admite hasta 24 imágenes en total' }, 400);
           }
@@ -815,10 +848,12 @@ export default {
                 httpMetadata: { contentType: file.type }
               });
               await db.prepare('INSERT INTO repair_order_photos (id, workshop_id, order_id, object_key, file_name, content_type, size_bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-                .bind(id, workshop.id, orderId, key, String(file.name || 'foto').slice(0, 255), file.type, file.size, createdAt).run();
-              saved.push({ id, file_name: String(file.name || 'foto').slice(0, 255), content_type: file.type, size_bytes: file.size, created_at: createdAt });
+                .bind(uploadId || id, workshop.id, orderId, key, String(file.name || 'foto').slice(0, 255), file.type, file.size, createdAt).run();
+              saved.push({ id: uploadId || id, file_name: String(file.name || 'foto').slice(0, 255), content_type: file.type, size_bytes: file.size, created_at: createdAt });
             } catch (err) {
               await env.FILES.delete(key).catch(() => {});
+              const previous = uploadId && await savedPhoto();
+              if (previous) return json({uploaded:1, photos:[previous]});
               return json({ error: 'No se pudieron guardar todas las imágenes' }, 500);
             }
           }
@@ -828,24 +863,36 @@ export default {
         return json({ error: 'Método no permitido' }, 405);
       }
 
+      if (subRoute === 'cash/history' && request.method === 'GET') {
+        const offset = Number(url.searchParams.get('offset') || 0);
+        if (!Number.isSafeInteger(offset) || offset < 0) return json({error:'Página inválida'},400);
+        const rows = await db.prepare(`SELECT id, amount_cents/100.0 AS amount, kind AS type, payment_method, notes AS concept, created_at
+          FROM cash_entries WHERE workshop_id=? ORDER BY created_at DESC,id DESC LIMIT 50 OFFSET ?`).bind(workshop.id,offset).all();
+        return json({entries:rows.results});
+      }
+
       // 6. Datos completos para el panel
       if (subRoute === 'data' && request.method === 'GET') {
-        const [settings, clientsRes, ordersRes, stockRes, cashRes] = await Promise.all([
+        const [settings, clientsRes, ordersRes, stockRes, cashTotals, cashRes] = await Promise.all([
           db.prepare('SELECT * FROM workshop_settings WHERE workshop_id = ?').bind(workshop.id).first(),
           db.prepare(`
-            SELECT c.*, (SELECT COUNT(*) FROM repair_orders ro WHERE ro.client_id = c.id) as order_count 
+            SELECT c.*, (SELECT COUNT(*) FROM repair_orders ro WHERE ro.client_id = c.id AND ro.workshop_id=c.workshop_id) as order_count
             FROM clients c WHERE c.workshop_id = ? ORDER BY c.created_at DESC
           `).bind(workshop.id).all(),
           db.prepare(`
             SELECT ro.*, c.name as client_name, c.phone as client_phone 
             FROM repair_orders ro 
-            LEFT JOIN clients c ON ro.client_id = c.id 
+            LEFT JOIN clients c ON ro.client_id = c.id AND c.workshop_id = ro.workshop_id
             WHERE ro.workshop_id = ? ORDER BY ro.order_number DESC
           `).bind(workshop.id).all(),
           db.prepare('SELECT * FROM stock_products WHERE workshop_id = ? ORDER BY name ASC').bind(workshop.id).all(),
+          db.prepare(`SELECT COALESCE(SUM(CASE WHEN kind='income' THEN amount_cents ELSE 0 END),0)/100.0 AS income,
+            COALESCE(SUM(CASE WHEN kind='expense' THEN amount_cents ELSE 0 END),0)/100.0 AS expense,
+            COALESCE(SUM(CASE WHEN kind='income' AND payment_method='mercadopago' THEN amount_cents ELSE 0 END),0)/100.0 AS mp
+            FROM cash_entries WHERE workshop_id=?`).bind(workshop.id).first(),
           db.prepare(`
             SELECT id, workshop_id, (CAST(amount_cents AS REAL) / 100) as amount, kind as type, payment_method, notes as concept, created_at 
-            FROM cash_entries WHERE workshop_id = ? ORDER BY created_at DESC LIMIT 50
+            FROM cash_entries WHERE workshop_id = ? ORDER BY created_at DESC,id DESC LIMIT 50
           `).bind(workshop.id).all()
         ]);
 
@@ -855,6 +902,7 @@ export default {
           clients: clientsRes?.results || [],
           orders: ordersRes?.results || [],
           stock: stockRes?.results || [],
+          cash_totals: cashTotals,
           cash_entries: cashRes?.results || []
         });
       }
@@ -908,17 +956,15 @@ export default {
           importedClients++;
         }
 
-        const maxRow = await db.prepare('SELECT MAX(order_number) as max_num FROM repair_orders WHERE workshop_id = ?').bind(workshop.id).first();
-        let nextNum = (maxRow?.max_num || 0) + 1;
 
         for (const d of demoOrders) {
           const oid = crypto.randomUUID();
           const cid = clientMap[d.client_id || d.client_name] || null;
           await db.prepare(`
             INSERT INTO repair_orders (id, workshop_id, client_id, order_number, brand, model, identifier, fault, condition, accessories, status, diagnosis, intake_key, version, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+            VALUES (?, ?, ?, (SELECT COALESCE(MAX(order_number),0)+1 FROM repair_orders WHERE workshop_id=?), ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
           `).bind(
-            oid, workshop.id, cid, nextNum++,
+            oid, workshop.id, cid, workshop.id,
             d.brand || 'Celular', d.model || 'Modelo', d.identifier || '',
             d.fault || 'Revisión técnica', d.condition || '', d.accessories || '',
             d.status || 'received', d.diagnosis || '', crypto.randomUUID().slice(0, 12),
@@ -930,40 +976,75 @@ export default {
         return json({ success: true, imported_clients: importedClients, imported_orders: importedOrders });
       }
 
+      if (subRoute === 'clients' && request.method === 'POST') {
+        const body = await request.json();
+        if (!body.name?.trim() || !body.phone?.trim()) return json({error:'Completá nombre y teléfono.'}, 400);
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await db.prepare('INSERT INTO clients (id, workshop_id, name, phone, email, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)')
+          .bind(id, workshop.id, body.name.trim(), body.phone.trim(), body.email || '', body.notes || '', now, now).run();
+        return json({id}, 201);
+      }
+
+      if (subRoute === 'brand' && request.method === 'PUT') {
+        const {name, phone, address='', logo_url=''} = await request.json();
+        if (!name?.trim() || !phone?.trim() || (logo_url && !/^https:\/\//i.test(logo_url))) return json({error:'Revisá nombre, teléfono y URL HTTPS del logo.'},400);
+        const now = new Date().toISOString();
+        await db.batch([
+          db.prepare('UPDATE workshops SET name=?, phone=?, address=?, updated_at=? WHERE id=?').bind(name,phone,address,now,workshop.id),
+          db.prepare('UPDATE workshop_settings SET name=?, phone=?, address=?, logo_url=?, updated_at=? WHERE workshop_id=?').bind(name,phone,address,logo_url,now,workshop.id)
+        ]);
+        return json({success:true});
+      }
+
       // 5. Crear orden
       if (subRoute === 'orders' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));
         let clientId = body.client_id;
         const nowIso = new Date().toISOString();
 
+        const orderId = body.request_id || crypto.randomUUID();
+        if (!/^[0-9a-f-]{36}$/i.test(orderId)) return json({error:'Identificador inválido'},400);
+        const existing = () => db.prepare('SELECT id, order_number, intake_key FROM repair_orders WHERE id=? AND workshop_id=?').bind(orderId,workshop.id).first();
+        const previous = await existing();
+        if (previous) return json({success:true,...previous});
+        const statements = [];
+        if (clientId && clientId !== 'NEW' && !await db.prepare('SELECT id FROM clients WHERE id=? AND workshop_id=?').bind(clientId, workshop.id).first()) return json({error:'Cliente no encontrado.'},404);
         if (clientId === 'NEW' || !clientId) {
           if (body.client_name) {
             clientId = crypto.randomUUID();
-            await db.prepare(`
+            statements.push(db.prepare(`
               INSERT INTO clients (id, workshop_id, name, phone, created_at, updated_at)
               VALUES (?, ?, ?, ?, ?, ?)
-            `).bind(clientId, workshop.id, body.client_name, body.client_phone || '', nowIso, nowIso).run();
+            `).bind(clientId, workshop.id, body.client_name, body.client_phone || '', nowIso, nowIso));
           } else {
-            clientId = null;
+            return json({error:'Elegí un cliente o ingresá su nombre.'},400);
           }
         }
 
-        const maxRow = await db.prepare('SELECT MAX(order_number) as max_num FROM repair_orders WHERE workshop_id = ?').bind(workshop.id).first();
-        const orderNumber = (maxRow?.max_num || 0) + 1;
-        const orderId = crypto.randomUUID();
+
         const intakeKey = crypto.randomUUID().slice(0, 12);
 
-        await db.prepare(`
+        statements.push(db.prepare(`
           INSERT INTO repair_orders (id, workshop_id, client_id, order_number, brand, model, identifier, fault, condition, accessories, status, intake_key, version, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, 1, ?, ?)
+          VALUES (?, ?, ?, (SELECT COALESCE(MAX(order_number),0)+1 FROM repair_orders WHERE workshop_id=?), ?, ?, ?, ?, ?, ?, 'received', ?, 1, ?, ?) RETURNING order_number
         `).bind(
-          orderId, workshop.id, clientId, orderNumber,
+          orderId, workshop.id, clientId, workshop.id,
           body.brand || '', body.model || '', body.identifier || '',
           body.fault || '', body.condition || '', body.accessories || '',
           intakeKey, nowIso, nowIso
-        ).run();
+        ));
+        let inserted;
+        try {
+          const batch = await db.batch(statements);
+          inserted = batch.at(-1).results[0];
+        } catch (err) {
+          const saved = await existing();
+          if (saved) return json({success:true,...saved});
+          throw err;
+        }
 
-        return json({ success: true, id: orderId, order_number: orderNumber, intake_key: intakeKey }, 201);
+        return json({ success: true, id: orderId, order_number: inserted.order_number, intake_key: intakeKey }, 201);
       }
 
       // 6. Actualizar estado de orden
@@ -971,8 +1052,8 @@ export default {
         const orderId = subRoute.split('/')[1];
         const body = await request.json().catch(() => ({}));
         const newStatus = body.status || 'received';
-        await db.prepare('UPDATE repair_orders SET status = ?, updated_at = ? WHERE id = ? AND workshop_id = ?')
-          .bind(newStatus, new Date().toISOString(), orderId, workshop.id).run();
+        await db.prepare('UPDATE repair_orders SET status = ?, public_diagnosis = COALESCE(?,public_diagnosis), updated_at = ? WHERE id = ? AND workshop_id = ?')
+          .bind(newStatus, typeof body.public_diagnosis === 'string' ? body.public_diagnosis.slice(0,2000) : null, new Date().toISOString(), orderId, workshop.id).run();
         return json({ success: true, status: newStatus });
       }
 

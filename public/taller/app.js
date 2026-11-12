@@ -175,9 +175,13 @@ async function api(path, options = {}) {
   return data;
 }
 
+const photoUploadIds = new WeakMap();
 async function uploadOrderPhotos(orderId, files) {
   const formData = new FormData();
-  files.forEach(file => formData.append('photos', file));
+  const file = files[0];
+  if (!photoUploadIds.has(file)) photoUploadIds.set(file, crypto.randomUUID());
+  formData.append('upload_id', photoUploadIds.get(file));
+  formData.append('photos', file);
   const token = getWorkshopToken();
   const res = await fetch(`/api/workshop/${currentSlug}/orders/${encodeURIComponent(orderId)}/photos`, {
     method: 'POST',
@@ -191,6 +195,21 @@ async function uploadOrderPhotos(orderId, files) {
   }
   if (!res.ok) throw new Error(data.error || 'No se pudieron cargar las fotos');
   return data;
+}
+
+const pendingPhotos = new Map();
+async function savePendingPhotos(orderId, files) {
+  if (files.length > 6) throw new Error('Elegí hasta seis imágenes por carga.');
+  const pending = pendingPhotos.get(orderId) || [];
+  for (const file of files) {
+    if (!pending.some(f => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) pending.push(file);
+  }
+  pendingPhotos.set(orderId, pending);
+  while (pending.length) {
+    await uploadOrderPhotos(orderId, [pending[0]]);
+    pending.shift();
+  }
+  pendingPhotos.delete(orderId);
 }
 
 async function renderOrderPhotoGallery(orderId, gallery) {
@@ -518,6 +537,7 @@ async function loadWorkshop() {
       orders: dataRes.orders || [],
       clients: dataRes.clients || [],
       stock: dataRes.stock || [],
+      cash_totals: dataRes.cash_totals,
       cash_entries: dataRes.cash_entries || []
     };
 
@@ -603,7 +623,8 @@ function setSection(sectionName) {
           orders: dataRes.orders || [],
           clients: dataRes.clients || [],
           stock: dataRes.stock || [],
-          cash_entries: dataRes.cash_entries || []
+          cash_totals: dataRes.cash_totals,
+      cash_entries: dataRes.cash_entries || []
         };
         renderOrders();
       })
@@ -867,10 +888,14 @@ function openOrderDetailModal(order) {
         <p class="muted" style="margin:4px 0 10px;font-size:12px;">Agregá imágenes al recibirlo o durante la reparación.</p>
         <input id="order-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple>
         <small class="muted">Hasta 6 imágenes por carga, máx. 8 MB cada una.</small>
+        <button id="retry-photos" type="button" hidden>Reintentar fotos pendientes</button>
         <div id="order-photo-gallery" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;"></div>
       </section>
 
       <form id="order-status-form" style="margin-top:16px;">
+        <label>Informe visible en el QR del cliente
+          <textarea id="public-diagnosis" maxlength="2000">${esc(order.public_diagnosis || '')}</textarea>
+        </label>
         <label>Cambiar estado de reparación
           <select id="edit-order-status" style="margin-top:6px;">
             <option value="received" ${order.status==='received'?'selected':''}>Recibido</option>
@@ -906,19 +931,33 @@ function openOrderDetailModal(order) {
 
   const photoGallery = d.querySelector('#order-photo-gallery');
   renderOrderPhotoGallery(order.id, photoGallery);
+  const retry = d.querySelector('#retry-photos');
+  const updatePending = () => {
+    const files = pendingPhotos.get(order.id) || [];
+    retry.hidden = !files.length;
+    retry.textContent = 'Reintentar pendientes: ' + files.map(f => f.name).join(', ');
+  };
+  updatePending();
+  retry.onclick = async () => {
+    retry.disabled = true;
+    try { await savePendingPhotos(order.id, []); }
+    catch (err) { toast(err.message,true); }
+    finally { retry.disabled=false; updatePending(); await renderOrderPhotoGallery(order.id, photoGallery); }
+  };
   d.querySelector('#order-photo-input')?.addEventListener('change', async event => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     event.target.disabled = true;
     try {
-      const result = await uploadOrderPhotos(order.id, files);
-      toast(`${result.uploaded} foto(s) guardada(s) en la orden #${order.order_number}`);
+      await savePendingPhotos(order.id, files);
+      toast(`${files.length} foto(s) guardada(s) en la orden #${order.order_number}`);
       await renderOrderPhotoGallery(order.id, photoGallery);
     } catch (err) {
       toast(err.message, true);
     } finally {
       event.target.value = '';
       event.target.disabled = false;
+      updatePending();
     }
   });
 
@@ -940,8 +979,9 @@ function openOrderDetailModal(order) {
     try {
       await api(`/api/workshop/${currentSlug}/orders/${order.id}/status`, {
         method: 'PUT',
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus, public_diagnosis: d.querySelector('#public-diagnosis').value })
       });
+      order.public_diagnosis = d.querySelector('#public-diagnosis').value;
       order.status = newStatus;
       toast(`Orden #${order.order_number} actualizada a "${STATUS_CONFIG[newStatus]?.label || newStatus}"`);
       d.close();
@@ -1035,25 +1075,25 @@ function renderStock() {
 function renderCash() {
   const entries = workshopData.cash_entries || [];
 
-  let income = 0;
-  let expense = 0;
-  let mpTotal = 0;
-
-  for (const e of entries) {
-    const amt = Number(e.amount || 0);
-    if (e.type === 'income') {
-      income += amt;
-      if (e.payment_method === 'mercadopago') mpTotal += amt;
-    } else {
-      expense += amt;
-    }
-  }
+  const {income=0, expense=0, mp:mpTotal=0} = workshopData.cash_totals || {};
 
   setText('#cash-income-total', formatMoney(income));
   setText('#cash-expense-total', formatMoney(expense));
   setText('#cash-mp-total', formatMoney(mpTotal));
   setText('#cash-net-total', formatMoney(income - expense));
 
+  const more = document.querySelector('#cash-more');
+  more.hidden = entries.length === 0 || entries.length % 50 !== 0;
+  more.onclick = async () => {
+    more.disabled = true;
+    try {
+      const page = await api(`/api/workshop/${currentSlug}/cash/history?offset=${entries.length}`);
+      entries.push(...page.entries);
+      renderCash();
+      more.hidden = page.entries.length < 50;
+    } catch(err) { toast(err.message,true); }
+    finally { more.disabled = false; }
+  };
   const container = document.querySelector('#cash-container');
   if (!container) return;
 
@@ -1185,6 +1225,7 @@ function openNewOrderModal() {
     };
   }
 
+  const requestId = crypto.randomUUID();
   d.querySelector('#new-intake-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const btn = d.querySelector('#btn-submit-order');
@@ -1193,6 +1234,7 @@ function openNewOrderModal() {
     const payload = Object.fromEntries(fd);
     const intakePhotos = fd.getAll('photos').filter(file => file instanceof File && file.size > 0);
     delete payload.photos;
+    payload.request_id = requestId;
 
     try {
       const res = await api(`/api/workshop/${currentSlug}/orders`, {
@@ -1202,7 +1244,7 @@ function openNewOrderModal() {
       toast(`¡Orden #${res.order_number} ingresada con éxito!`);
       if (intakePhotos.length) {
         try {
-          await uploadOrderPhotos(res.id, intakePhotos);
+          await savePendingPhotos(res.id, intakePhotos);
           toast(`Fotos guardadas en la orden #${res.order_number}`);
         } catch (photoErr) {
           toast(`La orden se creó, pero no se pudieron guardar las fotos: ${photoErr.message}`, true);
@@ -1267,16 +1309,8 @@ function openNewClientModal() {
     e.preventDefault();
     const fd = new FormData(e.target);
     try {
-      await api(`/api/workshop/${currentSlug}/orders`, {
-        method: 'POST',
-        body: JSON.stringify({
-          client_id: 'NEW',
-          client_name: fd.get('name'),
-          client_phone: fd.get('phone'),
-          brand: 'Consulta',
-          model: 'General',
-          fault: 'Registro inicial de cliente'
-        })
+      await api(`/api/workshop/${currentSlug}/clients`, {
+        method: 'POST', body: JSON.stringify(Object.fromEntries(fd))
       });
       toast('Cliente guardado con éxito');
       d.close();
@@ -1426,8 +1460,11 @@ function initEvents() {
   // Guardar datos de marca
   document.querySelector('#form-settings-brand')?.addEventListener('submit', async e => {
     e.preventDefault();
-    toast('Datos de marca guardados');
-    updateBrandUI();
+    try {
+      await api(`/api/workshop/${currentSlug}/brand`, {method:'PUT', body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});
+      await loadWorkshop();
+      toast('Datos de marca guardados');
+    } catch (err) { toast(err.message, true); }
   });
 
   // Guardar medios de pago desde Configuración

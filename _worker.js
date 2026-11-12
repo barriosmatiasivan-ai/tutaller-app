@@ -91,6 +91,25 @@ async function ensureAuthSchema(db) {
   }
 }
 
+let orderPhotosSchemaReady = false;
+async function ensureOrderPhotosSchema(db) {
+  if (orderPhotosSchemaReady || !db) return;
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS repair_order_photos (
+      id TEXT PRIMARY KEY,
+      workshop_id TEXT NOT NULL,
+      order_id TEXT NOT NULL,
+      object_key TEXT NOT NULL UNIQUE,
+      file_name TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  `).run();
+  await db.prepare('CREATE INDEX IF NOT EXISTS idx_repair_order_photos_order ON repair_order_photos(workshop_id, order_id, created_at)').run();
+  orderPhotosSchemaReady = true;
+}
+
 async function sendResendPinEmail(toEmail, pinCode, workshopName, env) {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {
@@ -727,6 +746,89 @@ export default {
         return json({ error: 'Acceso no autorizado al taller. Por favor ingresá con tu PIN.' }, 401);
       }
 
+      await ensureOrderPhotosSchema(db);
+
+      // Fotos de orden: almacenamiento privado por taller y acceso autenticado.
+      const photoRoute = subRoute.match(/^orders\/([^/]+)\/photos(?:\/([^/]+))?$/);
+      if (photoRoute) {
+        const orderId = decodeURIComponent(photoRoute[1]);
+        const photoId = photoRoute[2] ? decodeURIComponent(photoRoute[2]) : null;
+        const order = await db.prepare('SELECT id FROM repair_orders WHERE id = ? AND workshop_id = ?')
+          .bind(orderId, workshop.id).first();
+        if (!order) return json({ error: 'Orden no encontrada' }, 404);
+
+        if (request.method === 'GET' && photoId) {
+          const photo = await db.prepare('SELECT * FROM repair_order_photos WHERE id = ? AND order_id = ? AND workshop_id = ?')
+            .bind(photoId, orderId, workshop.id).first();
+          if (!photo) return json({ error: 'Foto no encontrada' }, 404);
+          if (!env.FILES) return json({ error: 'Almacenamiento de fotos no disponible' }, 503);
+          const object = await env.FILES.get(photo.object_key);
+          if (!object) return json({ error: 'La imagen ya no está disponible' }, 404);
+          return new Response(object.body, {
+            headers: {
+              'Content-Type': photo.content_type,
+              'Cache-Control': 'private, no-store',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+            }
+          });
+        }
+
+        if (request.method === 'GET') {
+          const photos = await db.prepare('SELECT id, file_name, content_type, size_bytes, created_at FROM repair_order_photos WHERE order_id = ? AND workshop_id = ? ORDER BY created_at DESC')
+            .bind(orderId, workshop.id).all();
+          return json({ photos: photos?.results || [] });
+        }
+
+        if (request.method === 'POST' && !photoId) {
+          if (!env.FILES) return json({ error: 'Almacenamiento de fotos no disponible' }, 503);
+          let form;
+          try {
+            form = await request.formData();
+          } catch (err) {
+            return json({ error: 'Formato de carga de imágenes inválido' }, 400);
+          }
+          const files = form.getAll('photos').filter(file => file && typeof file.arrayBuffer === 'function' && file.size > 0);
+          if (!files.length) return json({ error: 'Seleccioná al menos una imagen' }, 400);
+          if (files.length > 6) return json({ error: 'Podés subir hasta 6 imágenes por carga' }, 400);
+          const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic']);
+          if (files.some(file => !allowedTypes.has(file.type))) {
+            return json({ error: 'Formato no permitido. Usá JPG, PNG, WEBP o HEIC' }, 415);
+          }
+          if (files.some(file => file.size > 8 * 1024 * 1024)) {
+            return json({ error: 'Cada imagen debe pesar como máximo 8 MB' }, 413);
+          }
+          const currentCount = await db.prepare('SELECT COUNT(*) as count FROM repair_order_photos WHERE order_id = ? AND workshop_id = ?')
+            .bind(orderId, workshop.id).first();
+          if ((currentCount?.count || 0) + files.length > 24) {
+            return json({ error: 'La orden admite hasta 24 imágenes en total' }, 400);
+          }
+
+          const extensionByType = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic' };
+          const createdAt = new Date().toISOString();
+          const saved = [];
+          for (const file of files) {
+            const id = crypto.randomUUID();
+            const key = `${orderId}/${id}.${extensionByType[file.type]}`;
+            try {
+              await env.FILES.put(key, file.stream(), {
+                httpMetadata: { contentType: file.type }
+              });
+              await db.prepare('INSERT INTO repair_order_photos (id, workshop_id, order_id, object_key, file_name, content_type, size_bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+                .bind(id, workshop.id, orderId, key, String(file.name || 'foto').slice(0, 255), file.type, file.size, createdAt).run();
+              saved.push({ id, file_name: String(file.name || 'foto').slice(0, 255), content_type: file.type, size_bytes: file.size, created_at: createdAt });
+            } catch (err) {
+              await env.FILES.delete(key).catch(() => {});
+              return json({ error: 'No se pudieron guardar todas las imágenes' }, 500);
+            }
+          }
+          return json({ uploaded: saved.length, photos: saved }, 201);
+        }
+
+        return json({ error: 'Método no permitido' }, 405);
+      }
+
       // 6. Datos completos para el panel
       if (subRoute === 'data' && request.method === 'GET') {
         const [settings, clientsRes, ordersRes, stockRes, cashRes] = await Promise.all([
@@ -962,6 +1064,7 @@ async function purgeOldOrderPhotos(env, triggerType = 'manual') {
   const db = env.DB;
   const files = env.FILES;
   if (!db) throw new Error('Database binding missing');
+  await ensureOrderPhotosSchema(db);
 
   // 180 días atrás (6 meses)
   const sixMonthsAgo = new Date(Date.now() - 180 * 86400000).toISOString();
@@ -1002,6 +1105,8 @@ async function purgeOldOrderPhotos(env, triggerType = 'manual') {
     }
 
     // Marcar orden como purgada
+    await db.prepare('DELETE FROM repair_order_photos WHERE order_id = ? AND workshop_id = ?')
+      .bind(order.id, order.workshop_id).run();
     await db.prepare('UPDATE repair_orders SET photos_purged_at = ? WHERE id = ?')
       .bind(nowIso, order.id).run();
     ordersProcessed++;

@@ -746,11 +746,10 @@ export default {
         return json({ error: 'Acceso no autorizado al taller. Por favor ingresá con tu PIN.' }, 401);
       }
 
-      await ensureOrderPhotosSchema(db);
-
       // Fotos de orden: almacenamiento privado por taller y acceso autenticado.
       const photoRoute = subRoute.match(/^orders\/([^/]+)\/photos(?:\/([^/]+))?$/);
       if (photoRoute) {
+        await ensureOrderPhotosSchema(db);
         const orderId = decodeURIComponent(photoRoute[1]);
         const photoId = photoRoute[2] ? decodeURIComponent(photoRoute[2]) : null;
         const order = await db.prepare('SELECT id FROM repair_orders WHERE id = ? AND workshop_id = ?')

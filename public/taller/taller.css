@@ -1307,3 +1307,9 @@ body.is-login #workshop-login-view {
 
 
 
+
+@media (max-width: 700px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

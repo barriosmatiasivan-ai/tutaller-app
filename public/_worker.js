@@ -196,6 +196,15 @@ async function sendResendPinEmail(toEmail, pinCode, workshopName, env) {
   }
 }
 
+async function workshopLoginRole(db, workshop, email, env) {
+  const adminEmail = (env.SUPER_ADMIN_EMAIL || SUPER_ADMIN_DEFAULT).trim().toLowerCase();
+  if (email === adminEmail) return 'super_admin';
+  if (email === workshop.owner_email?.trim().toLowerCase()) return 'owner';
+  const user = await db.prepare('SELECT role FROM workshop_users WHERE workshop_id = ? AND LOWER(email) = ?')
+    .bind(workshop.id, email).first();
+  return user ? (user.role || 'technician') : null;
+}
+
 async function getWorkshopSession(request, env, workshopId) {
   const authHeader = request.headers.get('Authorization') || '';
   if (!authHeader.startsWith('Bearer ')) return null;
@@ -663,16 +672,7 @@ export default {
           return json({ error: 'Ingresá un correo electrónico válido.' }, 400);
         }
 
-        // Verificar si el correo pertenece al taller (dueño o técnico registrado)
-        const isOwner = workshop.owner_email && workshop.owner_email.toLowerCase() === email;
-        let registeredUser = null;
-
-        if (!isOwner) {
-          registeredUser = await db.prepare('SELECT id, name, role FROM workshop_users WHERE workshop_id = ? AND LOWER(email) = ?')
-            .bind(workshop.id, email).first();
-        }
-
-        if (!isOwner && !registeredUser) {
+        if (!await workshopLoginRole(db, workshop, email, env)) {
           return json({ error: 'Este correo no está registrado en este taller. Consultá con el administrador.' }, 403);
         }
 
@@ -719,22 +719,11 @@ export default {
           return json({ error: 'Código inválido o expirado. Solicitá uno nuevo.' }, 400);
         }
 
-        // Verificar pertenencia al taller
-        const isOwner = workshop.owner_email && workshop.owner_email.toLowerCase() === email;
-        let registeredUser = null;
-        if (!isOwner) {
-          registeredUser = await db.prepare('SELECT id, name, role FROM workshop_users WHERE workshop_id = ? AND LOWER(email) = ?')
-            .bind(workshop.id, email).first();
-        }
-        if (!isOwner && !registeredUser) {
+        const userRole = await workshopLoginRole(db, workshop, email, env);
+        if (!userRole) {
           return json({ error: 'Este correo no está registrado en este taller.' }, 403);
         }
 
-        // Marcar como usado
-
-
-        // Crear sesión de 30 días
-        const userRole = isOwner ? 'owner' : (registeredUser?.role || 'technician');
         const sessionToken = crypto.randomUUID() + '-' + crypto.randomUUID();
         const sessionExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
         const sessionId = crypto.randomUUID();

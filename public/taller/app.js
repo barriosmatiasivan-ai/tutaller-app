@@ -528,8 +528,11 @@ function updateHeaderUI() {
 }
 
 // Control de secciones
+let ordersRefreshSequence = 0;
+
 function setSection(sectionName) {
   activeSection = sectionName;
+  const refreshSequence = ++ordersRefreshSequence;
   document.querySelectorAll('.view-section').forEach(sec => sec.style.display = 'none');
   const target = document.querySelector(`#section-${sectionName}`);
   if (target) target.style.display = 'block';
@@ -539,6 +542,26 @@ function setSection(sectionName) {
   });
 
   renderCurrentSection();
+
+  // Refrescar desde D1 al abrir Reparaciones para mostrar siempre las órdenes guardadas.
+  if (sectionName === 'orders' && currentSlug && getWorkshopToken()) {
+    api(`/api/workshop/${currentSlug}/data`)
+      .then(dataRes => {
+        if (activeSection !== 'orders' || refreshSequence !== ordersRefreshSequence) return;
+        workshopData = {
+          orders: dataRes.orders || [],
+          clients: dataRes.clients || [],
+          stock: dataRes.stock || [],
+          cash_entries: dataRes.cash_entries || []
+        };
+        renderOrders();
+      })
+      .catch(err => {
+        if (activeSection === 'orders' && refreshSequence === ordersRefreshSequence) {
+          toast(`No se pudieron actualizar las reparaciones: ${err.message}`, true);
+        }
+      });
+  }
 }
 
 function renderCurrentSection() {

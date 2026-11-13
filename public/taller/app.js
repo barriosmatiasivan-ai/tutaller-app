@@ -940,12 +940,26 @@ function openOrderDetailModal(order) {
 
       ${order.client_phone ? `
         <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);">
+          <label>Generador de presupuesto por WhatsApp</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <input type="text" id="quote-detail" placeholder="Trabajo / repuesto (ej: Cambio de módulo)" value="${esc(order.public_diagnosis || order.fault || '')}" style="grid-column:1 / -1;">
+            <input type="number" id="quote-amount" min="0" step="any" placeholder="Importe total ($)" value="${Number(order.total_cost || 0) > 0 ? Number(order.total_cost) : ''}">
+            <input type="text" id="quote-eta" placeholder="Demora (ej: En el día)">
+            <input type="text" id="quote-warranty" placeholder="Garantía (ej: 30 días)" style="grid-column:1 / -1;">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+            <button type="button" class="primary compact" id="btn-send-quote-wa">💬 Enviar presupuesto (wa.me)</button>
+            <button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
           <label>Aviso rápido por WhatsApp</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
             <button type="button" class="primary compact" id="btn-modal-send-wa-bot" style="display:flex;align-items:center;gap:6px;">
               🤖 Enviar aviso automático (Bot QR)
             </button>
-            <a class="secondary compact" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop?.name || 'el taller'} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
+            <a class="secondary compact" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;" href="https://wa.me/${formatWaMePhone(order.client_phone)}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop?.name || 'el taller'} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
               💬 Abrir chat manual (wa.me)
             </a>
           </div>
@@ -985,6 +999,47 @@ function openOrderDetailModal(order) {
       event.target.value = '';
       event.target.disabled = false;
       updatePending();
+    }
+  });
+
+  const buildQuoteMessage = () => {
+    const detail = (d.querySelector('#quote-detail')?.value || '').trim();
+    const rawAmount = d.querySelector('#quote-amount')?.value;
+    const amountNum = Number(rawAmount);
+    const eta = (d.querySelector('#quote-eta')?.value || '').trim();
+    const warranty = (d.querySelector('#quote-warranty')?.value || '').trim();
+    if (!detail && !(amountNum > 0)) {
+      toast('Ingresá al menos el trabajo o el importe del presupuesto', true);
+      return null;
+    }
+    const lines = [
+      `Hola ${clientName}! Te pasamos el presupuesto para tu ${order.brand || ''} ${order.model || 'equipo'} (Orden #${order.order_number}) en ${currentWorkshop?.name || 'el taller'}:`,
+      ''
+    ];
+    if (detail) lines.push(`*Trabajo:* ${detail}`);
+    if (amountNum > 0) lines.push(`*Total:* ${formatMoney(amountNum)}`);
+    if (eta) lines.push(`*Demora estimada:* ${eta}`);
+    if (warranty) lines.push(`*Garantía:* ${warranty}`);
+    lines.push('', `Seguimiento de tu orden:\n${location.origin}${trackingUrl}`, '', '¿Confirmás para avanzar con la reparación?');
+    return lines.join('\n');
+  };
+
+  d.querySelector('#btn-send-quote-wa')?.addEventListener('click', () => {
+    const msg = buildQuoteMessage();
+    if (!msg) return;
+    const waPhone = formatWaMePhone(order.client_phone);
+    window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+  });
+
+  d.querySelector('#btn-send-quote-bot')?.addEventListener('click', async () => {
+    const msg = buildQuoteMessage();
+    if (!msg) return;
+    toast('Enviando presupuesto por WhatsApp... ⏳');
+    const res = await sendWaBotMessage(order.client_phone, msg);
+    if (res && res.success) {
+      toast('✅ ¡Presupuesto enviado al cliente!');
+    } else {
+      toast('⚠️ Bot no disponible. Usá "Enviar presupuesto (wa.me)".', true);
     }
   });
 

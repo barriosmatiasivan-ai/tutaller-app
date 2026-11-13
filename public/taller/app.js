@@ -1610,6 +1610,74 @@ function renderClients() {
   `).join('');
 }
 
+async function promptPurchaseCostAndUpdate(item, nextStatus, onDone) {
+  if (!item) return;
+  if (nextStatus === 'pending' || item.cash_entry_id) {
+    await api(`/api/workshop/${currentSlug}/purchases/${item.id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: nextStatus })
+    });
+    toast(
+      nextStatus === 'ordered' ? '📦 Marcado como pedido realizado'
+        : nextStatus === 'resolved' ? '✅ Ingreso al taller confirmado'
+        : '↩ Devuelto a Pendientes'
+    );
+    await loadWorkshop();
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+
+  const est = Number(item.estimated_cost_cents || 0) / 100;
+  const title = nextStatus === 'ordered' ? '📦 Confirmar pedido realizado' : '✅ Confirmar ingreso al taller';
+  const d = modal(title, `
+    <p style="margin-top:0;"><strong>${esc(item.name)} × ${Number(item.quantity || 1)}</strong></p>
+    <p class="muted" style="font-size:13px;">Ingresá el costo real pagado para registrarlo automáticamente como egreso en Caja.</p>
+    <form id="purchase-cost-form" class="form-grid">
+      <label>Costo pagado ($)
+        <input name="cost" id="purchase-confirm-cost" type="number" min="0" step="any" required value="${est > 0 ? est : ''}" placeholder="Ej: 28000">
+      </label>
+      <label>Medio de pago
+        <select name="payment_method">
+          <option value="efectivo">💵 Efectivo</option>
+          <option value="mercadopago">⚡ Mercado Pago</option>
+          <option value="transferencia">🏦 Transferencia</option>
+          <option value="tarjeta">💳 Tarjeta</option>
+        </select>
+      </label>
+      <div class="form-actions wide" style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="secondary" id="btn-cancel-purchase-cost">Cancelar</button>
+        <button type="submit" class="primary">${nextStatus === 'ordered' ? 'Confirmar pedido y registrar gasto' : 'Confirmar ingreso y registrar gasto'}</button>
+      </div>
+    </form>
+  `);
+  if (!d) return;
+  d.querySelector('#btn-cancel-purchase-cost')?.addEventListener('click', () => {
+    d.close();
+    if (typeof onDone === 'function') onDone();
+  });
+  d.querySelector('#purchase-cost-form')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const cost = Number(fd.get('cost') || 0);
+    const payment_method = String(fd.get('payment_method') || 'efectivo');
+    try {
+      await api(`/api/workshop/${currentSlug}/purchases/${item.id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: nextStatus, cost, payment_method })
+      });
+      toast(
+        (nextStatus === 'ordered' ? '📦 Pedido realizado' : '✅ Ingreso al taller confirmado') +
+        (cost > 0 ? ` · Gasto ${formatMoney(cost)} registrado en Caja` : '')
+      );
+      d.close();
+      await loadWorkshop();
+      if (typeof onDone === 'function') onDone();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+}
+
 // 4. Render Stock
 function renderStock() {
   const container = document.querySelector('#stock-container');
@@ -1643,6 +1711,7 @@ function renderStock() {
             ? `<span class="badge" style="background:rgba(59,130,246,0.16);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">🚚 Pedido realizado</span>`
             : `<span class="badge" style="background:rgba(245,158,11,0.16);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);">⏳ Pendiente de compra</span>`;
           const modelStr = n.order_number ? ` · 📱 Orden #${n.order_number} (${esc(n.order_brand || '')} ${esc(n.order_model || '')})` : '';
+          const costStr = Number(n.estimated_cost_cents || 0) > 0 ? ` · Costo: ${formatMoney(Number(n.estimated_cost_cents) / 100)}` : '';
           return `
             <div class="stock-card" style="align-items:center;gap:12px;flex-wrap:wrap;">
               <div style="flex:1;min-width:200px;">
@@ -1650,7 +1719,7 @@ function renderStock() {
                   <strong>${esc(n.name)} × ${Number(n.quantity || 1)}</strong>
                   ${badge}
                 </div>
-                <p class="muted" style="margin:4px 0 0;">${n.priority === 'high' ? '🔴 Prioridad Alta' : n.priority === 'low' ? '⚪ Prioridad Baja' : '🟡 Prioridad Normal'}${modelStr}${n.note ? ` · ${esc(n.note)}` : ''}</p>
+                <p class="muted" style="margin:4px 0 0;">${n.priority === 'high' ? '🔴 Prioridad Alta' : n.priority === 'low' ? '⚪ Prioridad Baja' : '🟡 Prioridad Normal'}${modelStr}${costStr}${n.note ? ` · ${esc(n.note)}` : ''}</p>
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 ${!isOrdered
@@ -1692,17 +1761,12 @@ function renderStock() {
   container.querySelectorAll('.btn-stock-need-status').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
-      btn.disabled = true;
+      const need = (workshopData.purchase_needs || []).find(n => String(n.id) === String(btn.dataset.id));
+      if (!need) return;
       try {
-        await api(`/api/workshop/${currentSlug}/purchases/${btn.dataset.id}/status`, {
-          method: 'PUT',
-          body: JSON.stringify({ status: btn.dataset.status })
-        });
-        toast(btn.dataset.status === 'ordered' ? '📦 Marcado como pedido realizado' : '✅ Ingreso al taller confirmado');
-        await loadWorkshop();
+        await promptPurchaseCostAndUpdate(need, btn.dataset.status);
       } catch (err) {
         toast(err.message, true);
-        btn.disabled = false;
       }
     });
   });
@@ -1726,6 +1790,56 @@ function renderCash() {
   setText('#cash-mp-total', formatMoney(mpTotal));
   setText('#cash-net-total', formatMoney(income - expense));
 
+  const searchInp = document.querySelector('#cash-filter-search');
+  const typeSel = document.querySelector('#cash-filter-type');
+  const fromInp = document.querySelector('#cash-filter-from');
+  const toInp = document.querySelector('#cash-filter-to');
+  const clearBtn = document.querySelector('#cash-filter-clear');
+
+  [searchInp, typeSel, fromInp, toInp].forEach(el => {
+    if (el && !el.dataset.cashFilterBound) {
+      el.dataset.cashFilterBound = '1';
+      el.addEventListener(el.tagName === 'SELECT' || el.type === 'date' ? 'change' : 'input', renderCash);
+    }
+  });
+  if (clearBtn && !clearBtn.dataset.cashFilterBound) {
+    clearBtn.dataset.cashFilterBound = '1';
+    clearBtn.addEventListener('click', () => {
+      if (searchInp) searchInp.value = '';
+      if (typeSel) typeSel.value = 'all';
+      if (fromInp) fromInp.value = '';
+      if (toInp) toInp.value = '';
+      renderCash();
+    });
+  }
+
+  const q = (searchInp?.value || '').trim().toLowerCase();
+  const typeFilter = typeSel?.value || 'all';
+  const fromDate = fromInp?.value || '';
+  const toDate = toInp?.value || '';
+  const hasFilters = Boolean(q || typeFilter !== 'all' || fromDate || toDate);
+  if (clearBtn) clearBtn.hidden = !hasFilters;
+
+  const filtered = entries.filter(e => {
+    if (typeFilter !== 'all' && e.type !== typeFilter) return false;
+    if (fromDate || toDate) {
+      const dStr = new Date(e.created_at).toLocaleDateString('en-CA'); // YYYY-MM-DD local
+      if (fromDate && dStr < fromDate) return false;
+      if (toDate && dStr > toDate) return false;
+    }
+    if (q) {
+      const hay = [
+        e.concept,
+        e.payment_method,
+        e.order_number ? `#${e.order_number}` : '',
+        e.order_brand,
+        e.order_model
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
   const more = document.querySelector('#cash-more');
   more.hidden = entries.length === 0 || entries.length % 50 !== 0;
   more.onclick = async () => {
@@ -1741,18 +1855,18 @@ function renderCash() {
   const container = document.querySelector('#cash-container');
   if (!container) return;
 
-  if (entries.length === 0) {
+  if (filtered.length === 0) {
     container.innerHTML = `
       <div class="empty">
         <span>💵</span>
-        <h3>Sin movimientos de caja</h3>
-        <p>Registrá los cobros y egresos diarios de tu mostrador.</p>
+        <h3>${hasFilters ? 'Sin movimientos con esos filtros' : 'Sin movimientos de caja'}</h3>
+        <p>${hasFilters ? 'Probá limpiando los filtros de fecha, tipo o búsqueda.' : 'Registrá los cobros y egresos diarios de tu mostrador.'}</p>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = entries.map(e => `
+  container.innerHTML = filtered.map(e => `
     <div class="cash-row">
       <div>
         <strong>${esc(e.concept || 'Movimiento')}</strong>
@@ -2215,12 +2329,15 @@ function openNewStockModal(editOrOpts = null) {
         </label>
       </div>
 
-      <div id="purchase-only-fields" class="wide" style="display:${defaultDest === 'purchase' ? 'grid' : 'none'};grid-template-columns:1fr;gap:12px;">
-        <label>Orden / Equipo vinculado (opcional)
+      <div id="purchase-only-fields" class="wide" style="display:${defaultDest === 'purchase' ? 'grid' : 'none'};grid-template-columns:1fr 1fr;gap:12px;">
+        <label class="wide">Orden / Equipo vinculado (opcional)
           <select name="order_id" id="stock-order-select">
             <option value="">Reposición general / stock</option>
             ${orderOptions}
           </select>
+        </label>
+        <label>Costo estimado ($) (opcional)
+          <input name="purchase_cost" type="number" min="0" step="any" placeholder="Ej: 28000">
         </label>
         <label>Nota / Proveedor / Calidad (opcional)
           <input name="note" placeholder="Ej: Calidad OLED / Mercado Libre / Proveedor local">
@@ -2295,7 +2412,8 @@ function openNewStockModal(editOrOpts = null) {
             quantity: Number(fd.get('quantity') || 1),
             priority: String(fd.get('priority') || 'normal'),
             order_id: orderId || null,
-            note: String(fd.get('note') || '').trim()
+            note: String(fd.get('note') || '').trim(),
+            cost: Number(fd.get('purchase_cost') || 0)
           })
         });
         toast('Agregado a la lista de compras');
@@ -2368,6 +2486,7 @@ function openPurchasingModal() {
     const modelLabel = item.order_number
       ? `${esc(item.order_brand || '')} ${esc(item.order_model || '')}`.trim()
       : '';
+    const estCost = Number(item.estimated_cost_cents || 0) / 100;
     return `
       <div class="purchase-row ${isChecked ? 'is-checked' : ''}" data-purchase-id="${item.id}" style="${isOrdered ? 'border-left:3px solid #60a5fa;' : ''}">
         <label class="purchase-check">
@@ -2379,6 +2498,8 @@ function openPurchasingModal() {
           <p class="muted">
             ${priorityLabel[item.priority] || 'Normal'}
             ${item.order_number ? ` · 📱 Orden #${item.order_number}${modelLabel ? ` (${modelLabel})` : ''}` : ' · Reposición general'}
+            ${estCost > 0 ? ` · Costo: ${formatMoney(estCost)}` : ''}
+            ${item.cash_entry_id ? ' · 💸 En caja' : ''}
           </p>
           ${item.note ? `<small class="muted">${esc(item.note)}</small>` : ''}
         </div>
@@ -2438,9 +2559,12 @@ function openPurchasingModal() {
 
     resultsEl.querySelectorAll('.btn-purchase-status').forEach(btn => {
       btn.addEventListener('click', async () => {
+        const item = (workshopData.purchase_needs || []).find(i => i.id === btn.dataset.id);
+        if (!item) return;
         btn.disabled = true;
         try {
-          await updateItemStatus(btn.dataset.id, btn.dataset.status);
+          checkedIds.delete(item.id);
+          await promptPurchaseCostAndUpdate(item, btn.dataset.status, () => openPurchasingModal());
         } catch (err) {
           toast(err.message, true);
           btn.disabled = false;

@@ -1322,6 +1322,7 @@ export default {
         const quantity = Math.max(1, Math.round(Number(body.quantity || 1)));
         const priority = ['high', 'normal', 'low'].includes(body.priority) ? body.priority : 'normal';
         const note = typeof body.note === 'string' ? body.note.trim().slice(0, 1000) : '';
+        const estimatedCostCents = Math.max(0, Math.round(Number(body.cost || 0) * 100));
         const orderId = typeof body.order_id === 'string' && body.order_id.trim() ? body.order_id.trim() : null;
         if (orderId) {
           const ord = await db.prepare('SELECT id FROM repair_orders WHERE id = ? AND workshop_id = ?').bind(orderId, workshop.id).first();
@@ -1331,9 +1332,9 @@ export default {
         const id = crypto.randomUUID();
         const nowIso = new Date().toISOString();
         await db.prepare(`
-          INSERT INTO purchase_needs (id, workshop_id, order_id, name, quantity, priority, note, status, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-        `).bind(id, workshop.id, orderId, name, quantity, priority, note, nowIso).run();
+          INSERT INTO purchase_needs (id, workshop_id, order_id, name, quantity, priority, note, estimated_cost_cents, status, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+        `).bind(id, workshop.id, orderId, name, quantity, priority, note, estimatedCostCents, nowIso).run();
 
         return json({ success: true, id }, 201);
       }
@@ -1344,15 +1345,38 @@ export default {
         if (!ids.length) return json({ error: 'Seleccioná al menos un faltante.' }, 400);
         const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : 'Comprado en lista de compras';
         const nowIso = new Date().toISOString();
+        const accountId = `acc-${workshop.id}`;
 
-        const stmts = ids.map(id =>
-          db.prepare(`
-            UPDATE purchase_needs
-            SET status = 'resolved', resolved_reason = ?, resolved_at = ?
-            WHERE id = ? AND workshop_id = ?
-          `).bind(reason, nowIso, id.trim(), workshop.id)
-        );
-        await db.batch(stmts);
+        const stmts = [];
+        for (const rawId of ids) {
+          const id = rawId.trim();
+          const existing = await db.prepare('SELECT * FROM purchase_needs WHERE id = ? AND workshop_id = ?').bind(id, workshop.id).first();
+          if (!existing) continue;
+          let cashEntryId = existing.cash_entry_id || null;
+          if (!cashEntryId && Number(existing.estimated_cost_cents || 0) > 0) {
+            cashEntryId = crypto.randomUUID();
+            const method = existing.payment_method || 'efectivo';
+            const notes = `Compra repuesto: ${existing.name}${existing.quantity > 1 ? ` × ${existing.quantity}` : ''}`;
+            stmts.push(
+              db.prepare(`
+                INSERT OR IGNORE INTO finance_accounts (id, workshop_id, direction, total_cents, cost_cents, created_at)
+                VALUES (?, ?, 'receivable', ?, 0, ?)
+              `).bind(accountId, workshop.id, existing.estimated_cost_cents, nowIso),
+              db.prepare(`
+                INSERT INTO cash_entries (id, workshop_id, account_id, amount_cents, kind, payment_method, notes, order_id, created_at)
+                VALUES (?, ?, ?, ?, 'expense', ?, ?, ?, ?)
+              `).bind(cashEntryId, workshop.id, accountId, existing.estimated_cost_cents, method, notes, existing.order_id || null, nowIso)
+            );
+          }
+          stmts.push(
+            db.prepare(`
+              UPDATE purchase_needs
+              SET status = 'resolved', resolved_reason = ?, resolved_at = ?, cash_entry_id = COALESCE(cash_entry_id, ?)
+              WHERE id = ? AND workshop_id = ?
+            `).bind(reason, nowIso, cashEntryId, id, workshop.id)
+          );
+        }
+        if (stmts.length) await db.batch(stmts);
         return json({ success: true, resolved: ids.length });
       }
 
@@ -1362,19 +1386,52 @@ export default {
         const nextStatus = ['pending', 'ordered', 'resolved'].includes(body.status) ? body.status : null;
         if (!nextStatus) return json({ error: 'Estado inválido.' }, 400);
 
+        const existing = await db.prepare('SELECT * FROM purchase_needs WHERE id = ? AND workshop_id = ?').bind(purchaseId, workshop.id).first();
+        if (!existing) return json({ error: 'Ítem no encontrado.' }, 404);
+
         const nowIso = new Date().toISOString();
         const reason = nextStatus === 'resolved'
           ? (typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : 'Ingreso al taller confirmado')
           : '';
         const resolvedAt = nextStatus === 'resolved' ? nowIso : null;
 
-        await db.prepare(`
-          UPDATE purchase_needs
-          SET status = ?, resolved_reason = ?, resolved_at = ?
-          WHERE id = ? AND workshop_id = ?
-        `).bind(nextStatus, reason, resolvedAt, purchaseId, workshop.id).run();
+        const hasCostInput = body.cost != null && body.cost !== '';
+        const costCents = hasCostInput
+          ? Math.max(0, Math.round(Number(body.cost) * 100))
+          : Number(existing.estimated_cost_cents || 0);
+        const method = typeof body.payment_method === 'string' && body.payment_method.trim()
+          ? body.payment_method.trim()
+          : (existing.payment_method || 'efectivo');
 
-        return json({ success: true, id: purchaseId, status: nextStatus });
+        let cashEntryId = existing.cash_entry_id || null;
+        const stmts = [];
+
+        if ((nextStatus === 'ordered' || nextStatus === 'resolved') && costCents > 0 && !cashEntryId) {
+          cashEntryId = crypto.randomUUID();
+          const accountId = `acc-${workshop.id}`;
+          const notes = `Compra repuesto: ${existing.name}${existing.quantity > 1 ? ` × ${existing.quantity}` : ''}`;
+          stmts.push(
+            db.prepare(`
+              INSERT OR IGNORE INTO finance_accounts (id, workshop_id, direction, total_cents, cost_cents, created_at)
+              VALUES (?, ?, 'receivable', ?, 0, ?)
+            `).bind(accountId, workshop.id, costCents, nowIso),
+            db.prepare(`
+              INSERT INTO cash_entries (id, workshop_id, account_id, amount_cents, kind, payment_method, notes, order_id, created_at)
+              VALUES (?, ?, ?, ?, 'expense', ?, ?, ?, ?)
+            `).bind(cashEntryId, workshop.id, accountId, costCents, method, notes, existing.order_id || null, nowIso)
+          );
+        }
+
+        stmts.push(
+          db.prepare(`
+            UPDATE purchase_needs
+            SET status = ?, resolved_reason = ?, resolved_at = ?, estimated_cost_cents = ?, payment_method = ?, cash_entry_id = ?
+            WHERE id = ? AND workshop_id = ?
+          `).bind(nextStatus, reason, resolvedAt, costCents, method, cashEntryId, purchaseId, workshop.id)
+        );
+
+        await db.batch(stmts);
+        return json({ success: true, id: purchaseId, status: nextStatus, cash_entry_id: cashEntryId });
       }
     }
 

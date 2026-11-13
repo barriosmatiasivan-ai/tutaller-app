@@ -377,8 +377,19 @@
           </div>
 
           <section class="panel">
-            <div class="panel-heading">
+            <div class="panel-heading" style="flex-wrap:wrap;gap:10px;">
               <h2>Últimos movimientos de caja</h2>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input type="search" id="cash-filter-search" placeholder="Buscar concepto, orden o equipo..." style="min-width:190px;">
+                <select id="cash-filter-type" aria-label="Filtrar por tipo">
+                  <option value="all">Todos</option>
+                  <option value="income">Solo ingresos</option>
+                  <option value="expense">Solo egresos</option>
+                </select>
+                <input type="date" id="cash-filter-from" title="Desde fecha" aria-label="Desde fecha">
+                <input type="date" id="cash-filter-to" title="Hasta fecha" aria-label="Hasta fecha">
+                <button type="button" class="secondary compact" id="cash-filter-clear" hidden>Limpiar</button>
+              </div>
             </div>
             <div id="cash-container"></div>
             <button id="cash-more" hidden>Ver movimientos anteriores</button>

@@ -344,13 +344,16 @@ export default {
         try {
           const response = await fetch(upstream.toString(), {
             method: request.method,
-            redirect: 'error',
+            redirect: 'manual',
             headers: {
               Authorization: 'Bearer ' + env.BOT_ADMIN_KEY.trim(),
               Accept: 'application/json',
               'User-Agent': 'TuTaller-Worker/1.0'
             }
           });
+          if (response.status >= 300 && response.status < 400) {
+            return json({ error: `El bot devolvió una redirección inesperada (HTTP ${response.status})` }, 500);
+          }
           const rawText = await response.text();
           let parsed = null;
           try { parsed = JSON.parse(rawText); } catch {}

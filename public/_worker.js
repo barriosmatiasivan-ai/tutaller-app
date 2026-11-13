@@ -1338,6 +1338,15 @@ export default {
         return json({ success: true, id: stockId, quantity });
       }
 
+      // 8c. Eliminar producto de stock
+      if (subRoute.startsWith('stock/') && request.method === 'DELETE') {
+        const stockId = subRoute.split('/')[1];
+        const existing = await db.prepare('SELECT id FROM stock_products WHERE id = ? AND workshop_id = ?').bind(stockId, workshop.id).first();
+        if (!existing) return json({ error: 'Producto no encontrado.' }, 404);
+        await db.prepare('DELETE FROM stock_products WHERE id = ? AND workshop_id = ?').bind(stockId, workshop.id).run();
+        return json({ success: true, id: stockId });
+      }
+
       // 9. Lista de compras / faltantes
       if (subRoute === 'purchases' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));

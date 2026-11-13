@@ -2290,12 +2290,50 @@ function openNewStockModal(editOrOpts = null) {
         <label>Modelos compatibles (opcional)
           <input name="compatible_models" value="${esc(item.compatible_models || '')}" placeholder="Ej: A52, A52s">
         </label>
-        <div class="form-actions wide">
+        <div class="form-actions wide" style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="secondary" id="btn-stock-to-purchase">🛒 Pasar a lista de compras</button>
+            <button type="button" class="secondary" id="btn-stock-delete" style="color:#f87171;">🗑️ Eliminar</button>
+          </div>
           <button type="submit" class="primary">Guardar cambios</button>
         </div>
       </form>
     `);
     if (!d) return;
+    d.querySelector('#btn-stock-to-purchase')?.addEventListener('click', async () => {
+      const form = d.querySelector('#new-stock-form');
+      const fd = new FormData(form);
+      const name = String(fd.get('name') || item.name || '').trim();
+      const qty = Math.max(1, Math.round(Number(fd.get('quantity') || item.quantity || 1)));
+      const cost = Number(fd.get('cost') || costVal || 0);
+      try {
+        await api(`/api/workshop/${currentSlug}/purchases`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name,
+            quantity: qty,
+            priority: 'normal',
+            cost
+          })
+        });
+        await api(`/api/workshop/${currentSlug}/stock/${item.id}`, { method: 'DELETE' });
+        toast('🛒 Movido a Lista de compras');
+        d.close();
+        await loadWorkshop();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+    d.querySelector('#btn-stock-delete')?.addEventListener('click', async () => {
+      try {
+        await api(`/api/workshop/${currentSlug}/stock/${item.id}`, { method: 'DELETE' });
+        toast('Producto eliminado del stock');
+        d.close();
+        await loadWorkshop();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
     d.querySelector('#new-stock-form')?.addEventListener('submit', async e => {
       e.preventDefault();
       const fd = new FormData(e.target);

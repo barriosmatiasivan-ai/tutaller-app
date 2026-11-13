@@ -1022,6 +1022,22 @@ function openOrderDetailModal(order) {
           <button type="button" class="secondary compact" id="btn-quote-png">🖼 Imagen (PNG)</button>
           <button type="button" class="secondary compact" id="btn-quote-pdf">📄 PDF / Imprimir</button>
         </div>
+        ${(() => {
+          const linkedNeeds = (workshopData.purchase_needs || []).filter(p => String(p.order_id) === String(order.id));
+          if (!linkedNeeds.length) return '';
+          return `
+            <div style="margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);">
+              <div style="font-size:12.5px;font-weight:600;margin-bottom:6px;color:#fbbf24;">🛒 Pedidos vinculados a esta orden (${linkedNeeds.length})</div>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                ${linkedNeeds.map(p => {
+                  const st = p.status === 'ordered' ? '🚚 Pedido realizado' : '⏳ Pendiente';
+                  const costTxt = Number(p.estimated_cost_cents || 0) > 0 ? ` · ${formatMoney(Number(p.estimated_cost_cents) / 100)}` : '';
+                  return `<div style="font-size:12.5px;display:flex;justify-content:space-between;gap:8px;"><span>• ${esc(p.name)} × ${Number(p.quantity || 1)}${costTxt}</span><span class="muted">${st}</span></div>`;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        })()}
       </div>
 
       ${order.client_phone ? `
@@ -2413,7 +2429,13 @@ function openNewStockModal(editOrOpts = null) {
         </label>
       </div>
 
-      <div class="form-actions wide">
+      <div id="purchase-batch-wrap" class="wide" style="display:none;flex-direction:column;gap:6px;padding:10px 12px;border-radius:10px;border:1px solid rgba(52,211,153,0.28);background:rgba(16,185,129,0.06);">
+        <div style="font-size:12.5px;font-weight:600;color:#34d399;">🛒 Ítems listos para pedir (<span id="purchase-batch-count">0</span>)</div>
+        <div id="purchase-batch-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+      </div>
+
+      <div class="form-actions wide" style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+        <button type="button" class="secondary" id="btn-add-purchase-batch" style="display:${defaultDest === 'purchase' ? 'inline-flex' : 'none'};">＋ Sumar otro ítem al pedido</button>
         <button type="submit" class="primary" id="btn-submit-stock-form">${defaultDest === 'purchase' ? '＋ Agregar a lista de compras' : 'Guardar producto'}</button>
       </div>
     </form>
@@ -2439,7 +2461,14 @@ function openNewStockModal(editOrOpts = null) {
   const prioWrap = d.querySelector('#purchase-priority-wrap');
   const stockFields = d.querySelector('#stock-only-fields');
   const purchaseFields = d.querySelector('#purchase-only-fields');
+  const batchWrap = d.querySelector('#purchase-batch-wrap');
+  const batchCountEl = d.querySelector('#purchase-batch-count');
+  const batchListEl = d.querySelector('#purchase-batch-list');
+  const addBatchBtn = d.querySelector('#btn-add-purchase-batch');
   const submitBtn = d.querySelector('#btn-submit-stock-form');
+
+  const purchaseBatch = [];
+  const defaultOrderModel = presetOrder ? `${presetOrder.brand || ''} ${presetOrder.model || ''}`.trim() : '';
 
   const addGlassRow = (modelVal = '', qtyVal = 1) => {
     if (!glassRowsEl) return;
@@ -2462,7 +2491,7 @@ function openNewStockModal(editOrOpts = null) {
     glassRowsEl.appendChild(row);
   };
 
-  addGlassRow();
+  addGlassRow(defaultOrderModel, 1);
   addGlassRowBtn?.addEventListener('click', () => {
     addGlassRow();
     glassRowsEl?.querySelector('.glass-model-row:last-child .glass-row-model')?.focus();
@@ -2481,24 +2510,51 @@ function openNewStockModal(editOrOpts = null) {
     }
   };
 
+  const renderPurchaseBatch = () => {
+    if (!batchWrap || !batchListEl || !batchCountEl) return;
+    const isPurchase = destSel?.value === 'purchase';
+    batchCountEl.textContent = String(purchaseBatch.length);
+    batchWrap.style.display = (isPurchase && purchaseBatch.length > 0) ? 'flex' : 'none';
+    batchListEl.innerHTML = purchaseBatch.map((b, idx) => {
+      const costTxt = b.cost > 0 ? ` · ${formatMoney(b.cost)}` : '';
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;">
+          <span>• <strong>${esc(b.name)}</strong> × ${b.quantity}${costTxt}${b.note ? ` <span class="muted">(${esc(b.note)})</span>` : ''}</span>
+          <button type="button" class="secondary compact btn-remove-batch-item" data-idx="${idx}" title="Quitar">✕</button>
+        </div>
+      `;
+    }).join('');
+    batchListEl.querySelectorAll('.btn-remove-batch-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        if (!Number.isNaN(idx)) {
+          purchaseBatch.splice(idx, 1);
+          renderPurchaseBatch();
+          syncDestUI();
+        }
+      });
+    });
+  };
+
   const syncDestUI = () => {
     const isPurchase = destSel?.value === 'purchase';
     const isOrderStockUse = Boolean(presetOrder && !isPurchase);
-    const activeCat = presetOrder ? 'Repuesto' : (catSel?.value || 'Repuesto');
+    const activeCat = isOrderStockUse ? 'Repuesto' : (catSel?.value || 'Repuesto');
     const isGlass = !isOrderStockUse && activeCat === 'Vidrio templado';
 
     if (existingWrap) existingWrap.style.display = isOrderStockUse ? 'block' : 'none';
-    if (catWrap) catWrap.style.display = presetOrder ? 'none' : 'block';
+    if (catWrap) catWrap.style.display = isOrderStockUse ? 'none' : 'block';
     if (partWrap) partWrap.style.display = (isOrderStockUse || isGlass) ? 'none' : 'block';
     if (glassWrap) glassWrap.style.display = isGlass ? 'flex' : 'none';
     if (customWrap) customWrap.style.display = (!isOrderStockUse && !isGlass && partSel?.value === '__OTHER__') ? 'block' : 'none';
-    if (customInp) customInp.required = Boolean(!isOrderStockUse && !isGlass && partSel?.value === '__OTHER__');
+    if (customInp) customInp.required = Boolean(!isOrderStockUse && !isGlass && partSel?.value === '__OTHER__' && purchaseBatch.length === 0);
 
     if (qtyWrap) qtyWrap.style.display = isGlass ? 'none' : 'block';
     if (modelsWrap) modelsWrap.style.display = isGlass ? 'none' : 'block';
     if (prioWrap) prioWrap.style.display = isPurchase ? 'block' : 'none';
     if (stockFields) stockFields.style.display = (!isPurchase && !presetOrder) ? 'grid' : 'none';
     if (purchaseFields) purchaseFields.style.display = isPurchase ? 'grid' : 'none';
+    if (addBatchBtn) addBatchBtn.style.display = isPurchase ? 'inline-flex' : 'none';
 
     if (qtyInp) {
       qtyInp.required = !isGlass;
@@ -2516,11 +2572,14 @@ function openNewStockModal(editOrOpts = null) {
     if (submitBtn) {
       submitBtn.disabled = Boolean(isOrderStockUse && !availableStock.length);
       submitBtn.textContent = isPurchase
-        ? '＋ Agregar a lista de compras'
+        ? (purchaseBatch.length > 0
+          ? `✓ Guardar ${purchaseBatch.length} pedido(s) en lista de compras`
+          : '＋ Agregar a lista de compras')
         : isOrderStockUse
           ? '✓ Usar del stock y descontar'
           : 'Guardar producto';
     }
+    renderPurchaseBatch();
   };
 
   populatePartOptions(catSel?.value || 'Repuesto');
@@ -2535,16 +2594,89 @@ function openNewStockModal(editOrOpts = null) {
     const isOther = partSel.value === '__OTHER__';
     if (customWrap) customWrap.style.display = isOther ? 'block' : 'none';
     if (customInp) {
-      customInp.required = isOther;
+      customInp.required = isOther && purchaseBatch.length === 0;
       if (isOther) customInp.focus();
     }
+  });
+
+  const collectPurchasePayloadsFromForm = () => {
+    const form = d.querySelector('#new-stock-form');
+    const fd = new FormData(form);
+    const activeCat = String(fd.get('category') || 'Repuesto');
+    const orderId = String(fd.get('order_id') || '').trim();
+    const linkedOrder = orderId ? orders.find(o => String(o.id) === orderId) : null;
+    const modelSuffix = linkedOrder ? `${linkedOrder.brand || ''} ${linkedOrder.model || ''}`.trim() : '';
+    const priority = String(fd.get('priority') || 'normal');
+    const note = String(fd.get('note') || '').trim();
+    const cost = Number(fd.get('purchase_cost') || 0);
+
+    if (activeCat === 'Vidrio templado') {
+      const glassRows = Array.from(d.querySelectorAll('#tempered-glass-rows .glass-model-row'))
+        .map(row => ({
+          model: String(row.querySelector('.glass-row-model')?.value || '').trim(),
+          qty: Math.max(1, Math.round(Number(row.querySelector('.glass-row-qty')?.value || 1)))
+        }))
+        .filter(r => r.model);
+      if (!glassRows.length) return { error: 'Ingresá al menos un modelo de vidrio templado' };
+      const rawType = String(fd.get('glass_type') || '').trim();
+      const glassPrefix = rawType
+        ? (rawType.toLowerCase().includes('vidrio') ? rawType : `Vidrio templado ${rawType}`)
+        : 'Vidrio templado';
+      return {
+        items: glassRows.map(r => ({
+          name: `${glassPrefix} — ${r.model}`,
+          quantity: r.qty,
+          priority,
+          order_id: orderId || null,
+          note,
+          cost
+        }))
+      };
+    }
+
+    const rawPart = fd.get('part_type') === '__OTHER__'
+      ? String(fd.get('custom_name') || '').trim()
+      : String(fd.get('part_type') || '').replace(/^\d+\s*-\s*/, '').trim();
+    if (!rawPart) return { error: 'Indicá el nombre del producto' };
+
+    const fullName = modelSuffix && !rawPart.toLowerCase().includes(modelSuffix.toLowerCase())
+      ? `${rawPart} — ${modelSuffix}`
+      : rawPart;
+    return {
+      items: [{
+        name: fullName,
+        quantity: Math.max(1, Number(fd.get('quantity') || 1)),
+        priority,
+        order_id: orderId || null,
+        note,
+        cost
+      }]
+    };
+  };
+
+  addBatchBtn?.addEventListener('click', () => {
+    const collected = collectPurchasePayloadsFromForm();
+    if (collected.error) {
+      toast(collected.error, true);
+      return;
+    }
+    purchaseBatch.push(...collected.items);
+    if (customInp) customInp.value = '';
+    const costInp = d.querySelector('#purchase-only-fields input[name="purchase_cost"]');
+    const noteInp = d.querySelector('#purchase-only-fields input[name="note"]');
+    if (costInp) costInp.value = '';
+    if (noteInp) noteInp.value = '';
+    if (qtyInp) qtyInp.value = '1';
+    renderPurchaseBatch();
+    syncDestUI();
+    toast(`＋ Sumado a la lista (${purchaseBatch.length} ítem${purchaseBatch.length === 1 ? '' : 's'})`);
   });
 
   d.querySelector('#new-stock-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const dest = String(fd.get('dest') || 'stock');
-    const selectedCategory = presetOrder ? 'Repuesto' : String(fd.get('category') || 'Repuesto');
+    const selectedCategory = String(fd.get('category') || 'Repuesto');
 
     try {
       if (presetOrder && dest === 'stock') {
@@ -2570,6 +2702,33 @@ function openNewStockModal(editOrOpts = null) {
         return;
       }
 
+      if (dest === 'purchase') {
+        let itemsToSave = [];
+        if (purchaseBatch.length > 0) {
+          itemsToSave = [...purchaseBatch];
+        } else {
+          const collected = collectPurchasePayloadsFromForm();
+          if (collected.error) {
+            toast(collected.error, true);
+            return;
+          }
+          itemsToSave = collected.items;
+        }
+
+        for (const payload of itemsToSave) {
+          await api(`/api/workshop/${currentSlug}/purchases`, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+        }
+        toast(itemsToSave.length > 1
+          ? `✓ ${itemsToSave.length} pedidos agregados a la lista de compras`
+          : 'Agregado a la lista de compras');
+        d.close();
+        await loadWorkshop();
+        return;
+      }
+
       if (selectedCategory === 'Vidrio templado') {
         const glassRows = Array.from(d.querySelectorAll('#tempered-glass-rows .glass-model-row'))
           .map(row => ({
@@ -2588,53 +2747,35 @@ function openNewStockModal(editOrOpts = null) {
           ? (rawType.toLowerCase().includes('vidrio') ? rawType : `Vidrio templado ${rawType}`)
           : 'Vidrio templado';
 
-        if (dest === 'purchase') {
-          const orderId = String(fd.get('order_id') || '').trim();
-          for (const r of glassRows) {
-            await api(`/api/workshop/${currentSlug}/purchases`, {
-              method: 'POST',
-              body: JSON.stringify({
-                name: `${glassPrefix} — ${r.model}`,
-                quantity: r.qty,
-                priority: String(fd.get('priority') || 'normal'),
-                order_id: orderId || null,
-                note: String(fd.get('note') || '').trim(),
-                cost: Number(fd.get('purchase_cost') || 0)
-              })
-            });
-          }
-          toast(`✓ ${glassRows.length} modelo(s) agregado(s) a la lista de compras`);
-        } else {
-          const costNum = Number(fd.get('cost') || 0);
-          const priceNum = Number(fd.get('price') || 0);
-          const recordCash = fd.get('record_cash') === '1';
-          const payMethod = String(fd.get('payment_method') || 'efectivo');
-          const skuVal = String(fd.get('sku') || '').trim();
-          let totalUnits = 0;
-          let cashCount = 0;
+        const costNum = Number(fd.get('cost') || 0);
+        const priceNum = Number(fd.get('price') || 0);
+        const recordCash = fd.get('record_cash') === '1';
+        const payMethod = String(fd.get('payment_method') || 'efectivo');
+        const skuVal = String(fd.get('sku') || '').trim();
+        let totalUnits = 0;
+        let cashCount = 0;
 
-          for (const r of glassRows) {
-            totalUnits += r.qty;
-            const res = await api(`/api/workshop/${currentSlug}/stock`, {
-              method: 'POST',
-              body: JSON.stringify({
-                name: `${glassPrefix} — ${r.model}`,
-                category: 'Vidrio templado',
-                quantity: r.qty,
-                price: priceNum,
-                cost: costNum,
-                sku: skuVal,
-                compatible_models: r.model,
-                payment_method: payMethod,
-                record_cash: recordCash
-              })
-            });
-            if (res?.cash_entry_id) cashCount++;
-          }
-          toast(cashCount > 0
-            ? `✓ ${glassRows.length} modelo(s) (${totalUnits} u.) agregado(s) al stock · Egreso ${formatMoney(costNum * totalUnits)} registrado en Caja`
-            : `✓ ${glassRows.length} modelo(s) (${totalUnits} u.) agregado(s) al stock`);
+        for (const r of glassRows) {
+          totalUnits += r.qty;
+          const res = await api(`/api/workshop/${currentSlug}/stock`, {
+            method: 'POST',
+            body: JSON.stringify({
+              name: `${glassPrefix} — ${r.model}`,
+              category: 'Vidrio templado',
+              quantity: r.qty,
+              price: priceNum,
+              cost: costNum,
+              sku: skuVal,
+              compatible_models: r.model,
+              payment_method: payMethod,
+              record_cash: recordCash
+            })
+          });
+          if (res?.cash_entry_id) cashCount++;
         }
+        toast(cashCount > 0
+          ? `✓ ${glassRows.length} modelo(s) (${totalUnits} u.) agregado(s) al stock · Egreso ${formatMoney(costNum * totalUnits)} registrado en Caja`
+          : `✓ ${glassRows.length} modelo(s) (${totalUnits} u.) agregado(s) al stock`);
         d.close();
         await loadWorkshop();
         return;
@@ -2649,53 +2790,31 @@ function openNewStockModal(editOrOpts = null) {
         return;
       }
 
-      if (dest === 'purchase') {
-        const orderId = String(fd.get('order_id') || '').trim();
-        const linkedOrder = orderId ? orders.find(o => String(o.id) === orderId) : null;
-        const modelSuffix = linkedOrder ? `${linkedOrder.brand || ''} ${linkedOrder.model || ''}`.trim() : '';
-        const fullName = modelSuffix && !rawPart.toLowerCase().includes(modelSuffix.toLowerCase())
-          ? `${rawPart} — ${modelSuffix}`
-          : rawPart;
+      const models = String(fd.get('compatible_models') || '').trim();
+      const fullName = models && !rawPart.toLowerCase().includes(models.toLowerCase())
+        ? `${rawPart} — ${models}`
+        : rawPart;
+      const qtyNum = Number(fd.get('quantity') || 0);
+      const costNum = Number(fd.get('cost') || 0);
+      const recordCash = fd.get('record_cash') === '1';
 
-        await api(`/api/workshop/${currentSlug}/purchases`, {
-          method: 'POST',
-          body: JSON.stringify({
-            name: fullName,
-            quantity: Number(fd.get('quantity') || 1),
-            priority: String(fd.get('priority') || 'normal'),
-            order_id: orderId || null,
-            note: String(fd.get('note') || '').trim(),
-            cost: Number(fd.get('purchase_cost') || 0)
-          })
-        });
-        toast('Agregado a la lista de compras');
-      } else {
-        const models = String(fd.get('compatible_models') || '').trim();
-        const fullName = models && !rawPart.toLowerCase().includes(models.toLowerCase())
-          ? `${rawPart} — ${models}`
-          : rawPart;
-        const qtyNum = Number(fd.get('quantity') || 0);
-        const costNum = Number(fd.get('cost') || 0);
-        const recordCash = fd.get('record_cash') === '1';
-
-        const res = await api(`/api/workshop/${currentSlug}/stock`, {
-          method: 'POST',
-          body: JSON.stringify({
-            name: fullName,
-            category: selectedCategory,
-            quantity: qtyNum,
-            price: Number(fd.get('price') || 0),
-            cost: costNum,
-            sku: String(fd.get('sku') || '').trim(),
-            compatible_models: models,
-            payment_method: String(fd.get('payment_method') || 'efectivo'),
-            record_cash: recordCash
-          })
-        });
-        toast(res?.cash_entry_id
-          ? `Producto agregado al stock · Egreso ${formatMoney(costNum * qtyNum)} registrado en Caja`
-          : 'Producto agregado al stock');
-      }
+      const res = await api(`/api/workshop/${currentSlug}/stock`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: fullName,
+          category: selectedCategory,
+          quantity: qtyNum,
+          price: Number(fd.get('price') || 0),
+          cost: costNum,
+          sku: String(fd.get('sku') || '').trim(),
+          compatible_models: models,
+          payment_method: String(fd.get('payment_method') || 'efectivo'),
+          record_cash: recordCash
+        })
+      });
+      toast(res?.cash_entry_id
+        ? `Producto agregado al stock · Egreso ${formatMoney(costNum * qtyNum)} registrado en Caja`
+        : 'Producto agregado al stock');
       d.close();
       await loadWorkshop();
     } catch (err) {

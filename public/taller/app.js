@@ -2345,11 +2345,23 @@ function openNewStockModal(editOrOpts = null) {
         <label>Precio de venta ($)
           <input name="price" type="number" min="0" step="any" placeholder="Ej: 45000">
         </label>
-        <label>Costo ($) (opcional)
+        <label>Costo unitario ($) (opcional)
           <input name="cost" type="number" min="0" step="any" placeholder="Ej: 28000">
+        </label>
+        <label>Medio de pago (si tuvo costo)
+          <select name="payment_method">
+            <option value="efectivo">💵 Efectivo</option>
+            <option value="mercadopago">⚡ Mercado Pago</option>
+            <option value="transferencia">🏦 Transferencia</option>
+            <option value="tarjeta">💳 Tarjeta</option>
+          </select>
         </label>
         <label>SKU / Código (opcional)
           <input name="sku" placeholder="Ej: MOD-A52">
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;flex-direction:row;margin-top:18px;font-size:13px;">
+          <input type="checkbox" name="record_cash" value="1" checked style="width:auto;margin:0;">
+          <span>Registrar costo en Caja (egreso)</span>
         </label>
       </div>
 
@@ -2501,20 +2513,27 @@ function openNewStockModal(editOrOpts = null) {
         const fullName = models && !rawPart.toLowerCase().includes(models.toLowerCase())
           ? `${rawPart} — ${models}`
           : rawPart;
+        const qtyNum = Number(fd.get('quantity') || 0);
+        const costNum = Number(fd.get('cost') || 0);
+        const recordCash = fd.get('record_cash') === '1';
 
-        await api(`/api/workshop/${currentSlug}/stock`, {
+        const res = await api(`/api/workshop/${currentSlug}/stock`, {
           method: 'POST',
           body: JSON.stringify({
             name: fullName,
             category: String(fd.get('category') || 'General'),
-            quantity: Number(fd.get('quantity') || 0),
+            quantity: qtyNum,
             price: Number(fd.get('price') || 0),
-            cost: Number(fd.get('cost') || 0),
+            cost: costNum,
             sku: String(fd.get('sku') || '').trim(),
-            compatible_models: models
+            compatible_models: models,
+            payment_method: String(fd.get('payment_method') || 'efectivo'),
+            record_cash: recordCash
           })
         });
-        toast('Producto agregado al stock');
+        toast(res?.cash_entry_id
+          ? `Producto agregado al stock · Egreso ${formatMoney(costNum * qtyNum)} registrado en Caja`
+          : 'Producto agregado al stock');
       }
       d.close();
       await loadWorkshop();

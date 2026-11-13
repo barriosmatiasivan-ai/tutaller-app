@@ -1279,15 +1279,40 @@ export default {
         const minimumQuantity = Math.max(0, Math.round(Number(body.minimum_quantity || 0)));
         const unitCostCents = Math.max(0, Math.round(Number(body.cost || 0) * 100));
         const salePriceCents = Math.max(0, Math.round(Number(body.price || 0) * 100));
+        const recordCash = body.record_cash !== false && body.record_cash !== 'false' && body.record_cash !== '0';
+        const method = ['efectivo', 'mercadopago', 'transferencia', 'tarjeta'].includes(body.payment_method)
+          ? body.payment_method
+          : 'efectivo';
 
         const id = crypto.randomUUID();
         const nowIso = new Date().toISOString();
-        await db.prepare(`
-          INSERT INTO stock_products (id, workshop_id, sku, name, category, compatible_models, quantity, minimum_quantity, supplier, unit_cost_cents, sale_price_cents, version, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-        `).bind(id, workshop.id, sku, name, category, compatibleModels, quantity, minimumQuantity, supplier, unitCostCents, salePriceCents, nowIso).run();
+        const statements = [
+          db.prepare(`
+            INSERT INTO stock_products (id, workshop_id, sku, name, category, compatible_models, quantity, minimum_quantity, supplier, unit_cost_cents, sale_price_cents, version, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          `).bind(id, workshop.id, sku, name, category, compatibleModels, quantity, minimumQuantity, supplier, unitCostCents, salePriceCents, nowIso)
+        ];
 
-        return json({ success: true, id }, 201);
+        let cashEntryId = null;
+        if (recordCash && unitCostCents > 0 && quantity > 0) {
+          const totalCostCents = unitCostCents * quantity;
+          const accountId = `acc-${workshop.id}`;
+          cashEntryId = crypto.randomUUID();
+          const cashNotes = `Compra stock: ${name}${quantity > 1 ? ` × ${quantity}` : ''}`.slice(0, 300);
+          statements.push(
+            db.prepare(`
+              INSERT OR IGNORE INTO finance_accounts (id, workshop_id, direction, total_cents, cost_cents, created_at)
+              VALUES (?, ?, 'receivable', ?, 0, ?)
+            `).bind(accountId, workshop.id, totalCostCents, nowIso),
+            db.prepare(`
+              INSERT INTO cash_entries (id, workshop_id, account_id, amount_cents, kind, payment_method, notes, order_id, created_at)
+              VALUES (?, ?, ?, ?, 'expense', ?, ?, NULL, ?)
+            `).bind(cashEntryId, workshop.id, accountId, totalCostCents, method, cashNotes, nowIso)
+          );
+        }
+
+        await db.batch(statements);
+        return json({ success: true, id, cash_entry_id: cashEntryId }, 201);
       }
 
       // 8b. Actualizar cantidad / precio de producto en stock

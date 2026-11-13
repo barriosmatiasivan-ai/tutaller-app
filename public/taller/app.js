@@ -468,7 +468,12 @@ async function disconnectWaBot() {
   }
 }
 
+function isBotEnabledForWorkshop() {
+  return currentSlug === 'repara-tu-celu';
+}
+
 async function sendWaBotMessage(phone, message) {
+  if (!isBotEnabledForWorkshop()) return null;
   const cfg = getWaBotConfig();
   if (!phone) return null;
 
@@ -506,6 +511,7 @@ async function sendWaBotMessage(phone, message) {
 }
 
 async function triggerAutoWhatsApp(order, type) {
+  if (!isBotEnabledForWorkshop()) return;
   const cfg = getWaBotConfig();
 
   if (type === 'intake' && !cfg.autoIntake) return;
@@ -997,7 +1003,7 @@ function openOrderDetailModal(order) {
           <button type="button" class="secondary compact" id="btn-order-need-part">🛒 Faltante</button>
           ${order.client_phone ? `
             <button type="button" class="secondary compact" id="btn-send-quote-wa">💬 Enviar (wa.me)</button>
-            <button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>
+            ${isBotEnabledForWorkshop() ? `<button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>` : ''}
           ` : ''}
           <button type="button" class="secondary compact" id="btn-quote-png">🖼 Imagen (PNG)</button>
           <button type="button" class="secondary compact" id="btn-quote-pdf">📄 PDF / Imprimir</button>
@@ -1008,10 +1014,12 @@ function openOrderDetailModal(order) {
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
           <label>Aviso rápido por WhatsApp</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-            <button type="button" class="primary compact" id="btn-modal-send-wa-bot" style="display:flex;align-items:center;gap:6px;">
-              🤖 Enviar aviso automático (Bot QR)
-            </button>
-            <a class="secondary compact" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;" href="https://wa.me/${formatWaMePhone(order.client_phone)}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop?.name || 'el taller'} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
+            ${isBotEnabledForWorkshop() ? `
+              <button type="button" class="primary compact" id="btn-modal-send-wa-bot" style="display:flex;align-items:center;gap:6px;">
+                🤖 Enviar aviso automático (Bot QR)
+              </button>
+            ` : ''}
+            <a class="${isBotEnabledForWorkshop() ? 'secondary' : 'primary'} compact" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;" href="https://wa.me/${formatWaMePhone(order.client_phone)}?text=${encodeURIComponent(`Hola ${clientName}! Te escribimos de ${currentWorkshop?.name || 'el taller'} para contarte que tu ${order.brand} ${order.model} ya se encuentra ${st.label}. Podés ver los detalles en tu enlace de seguimiento: ${location.origin}${trackingUrl}`)}" target="_blank" rel="noopener noreferrer">
               💬 Abrir chat manual (wa.me)
             </a>
           </div>

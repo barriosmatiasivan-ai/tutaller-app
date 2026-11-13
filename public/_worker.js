@@ -808,8 +808,11 @@ export default {
         return json({ error: 'Acceso no autorizado al taller. Por favor ingresá con tu PIN.' }, 401);
       }
 
-      // Envío de WhatsApp automático usando el bot central configurado en el servidor
+      // Envío de WhatsApp automático usando el bot central configurado en el servidor (solo repara-tu-celu)
       if (subRoute === 'bot/send' && request.method === 'POST') {
+        if (slug !== 'repara-tu-celu') {
+          return json({ error: 'Bot de WhatsApp disponible únicamente para el taller autorizado.' }, 403);
+        }
         if (!env.BOT_URL || !env.BOT_API_KEY) {
           return json({ error: 'Bot de WhatsApp no configurado en el servidor.' }, 503);
         }

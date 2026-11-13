@@ -347,7 +347,8 @@ export default {
             redirect: 'error',
             headers: {
               Authorization: 'Bearer ' + env.BOT_ADMIN_KEY.trim(),
-              Accept: 'application/json'
+              Accept: 'application/json',
+              'User-Agent': 'TuTaller-Worker/1.0'
             }
           });
           const rawText = await response.text();
@@ -355,7 +356,7 @@ export default {
           try { parsed = JSON.parse(rawText); } catch {}
           if (!response.ok) {
             const msg = parsed?.error || `El bot respondió HTTP ${response.status}`;
-            const status = response.status === 401 ? 502 : response.status;
+            const status = (response.status === 401 || response.status === 502) ? 500 : response.status;
             return json({ error: msg }, status);
           }
           return new Response(parsed ? JSON.stringify(parsed) : rawText, {
@@ -363,7 +364,7 @@ export default {
             headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
           });
         } catch (err) {
-          return json({ error: `No se pudo conectar al bot (${err?.message || 'error de red'})` }, 502);
+          return json({ error: `No se pudo conectar al bot (${err?.message || 'error de red'})` }, 500);
         }
       }
 

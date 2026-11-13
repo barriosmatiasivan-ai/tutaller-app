@@ -1071,83 +1071,186 @@ function openOrderDetailModal(order) {
     if (!q) return;
     try {
       const canvas = document.createElement('canvas');
-      canvas.width = 900;
-      canvas.height = 1040;
+      canvas.width = 960;
+      canvas.height = 980;
       const ctx = canvas.getContext('2d');
 
-      ctx.fillStyle = '#f8fafc';
+      const rrect = (x, y, w, h, r) => {
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, r);
+      };
+
+      // Fondo general suave
+      ctx.fillStyle = '#eef2f6';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Franja verde superior
-      ctx.fillStyle = '#059669';
-      ctx.fillRect(0, 0, canvas.width, 160);
+      // Tarjeta principal
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 34px sans-serif';
-      ctx.fillText(q.workshopName, 44, 68);
-      ctx.font = '20px sans-serif';
-      ctx.fillStyle = '#d1fae5';
-      ctx.fillText([q.workshopPhone, q.workshopAddress].filter(Boolean).join(' · ') || 'Servicio Técnico Especializado', 44, 105);
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`PRESUPUESTO · ORDEN #${q.orderNumber}`, 44, 140);
-
-      // Cuerpo blanco
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(36, 190, 828, 720);
-      ctx.strokeStyle = '#e2e8f0';
+      rrect(36, 32, 888, 916, 20);
+      ctx.fill();
+      ctx.strokeStyle = '#dbe3ec';
       ctx.lineWidth = 2;
-      ctx.strokeRect(36, 190, 828, 720);
+      ctx.stroke();
 
-      let y = 248;
-      const drawRow = (label, value, boldVal = false) => {
+      // Header con degradado verde esmeralda
+      ctx.save();
+      rrect(36, 32, 888, 164, [20, 20, 0, 0]);
+      ctx.clip();
+      const grad = ctx.createLinearGradient(36, 32, 924, 196);
+      grad.addColorStop(0, '#047857');
+      grad.addColorStop(1, '#064e3b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(36, 32, 888, 164);
+      ctx.restore();
+
+      // Logo en header
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((res, rej) => {
+          img.onload = res;
+          img.onerror = rej;
+          img.src = q.logoUrl;
+        });
+        ctx.save();
+        rrect(68, 66, 96, 96, 16);
+        ctx.fillStyle = 'rgba(255,255,255,0.14)';
+        ctx.fill();
+        ctx.clip();
+        ctx.drawImage(img, 68, 66, 96, 96);
+        ctx.restore();
+      } catch {}
+
+      // Datos del taller (izquierda)
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 34px system-ui, -apple-system, sans-serif';
+      ctx.fillText(q.workshopName, 184, 102);
+      ctx.fillStyle = '#a7f3d0';
+      ctx.font = '19px system-ui, -apple-system, sans-serif';
+      ctx.fillText([q.workshopPhone, q.workshopAddress].filter(Boolean).join('  ·  ') || 'Servicio Técnico Especializado', 184, 136);
+
+      // Badge Orden y Fecha (derecha)
+      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      rrect(666, 62, 226, 104, 14);
+      ctx.fill();
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#a7f3d0';
+      ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
+      ctx.fillText('PRESUPUESTO', 872, 90);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText(`Orden #${q.orderNumber}`, 872, 124);
+      ctx.fillStyle = '#d1fae5';
+      ctx.font = '15px system-ui, -apple-system, sans-serif';
+      ctx.fillText(new Date().toLocaleDateString('es-AR'), 872, 150);
+      ctx.textAlign = 'left';
+
+      // Tarjetas Cliente y Equipo (2 columnas)
+      const drawInfoCard = (x, y, w, h, label, title, sub = '') => {
+        ctx.fillStyle = '#f8fafc';
+        rrect(x, y, w, h, 14);
+        ctx.fill();
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
         ctx.fillStyle = '#64748b';
-        ctx.font = 'bold 18px sans-serif';
-        ctx.fillText(label.toUpperCase(), 68, y);
-        y += 32;
+        ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+        ctx.fillText(label, x + 22, y + 30);
         ctx.fillStyle = '#0f172a';
-        ctx.font = boldVal ? 'bold 26px sans-serif' : '24px sans-serif';
-        const words = String(value || '-').split(' ');
-        let line = '';
-        for (const w of words) {
-          const test = line ? line + ' ' + w : w;
-          if (ctx.measureText(test).width > 760) {
-            ctx.fillText(line, 68, y);
-            y += 32;
-            line = w;
-          } else {
-            line = test;
-          }
-        }
-        if (line) {
-          ctx.fillText(line, 68, y);
-          y += 42;
+        ctx.font = 'bold 23px system-ui, -apple-system, sans-serif';
+        ctx.fillText(title, x + 22, y + 62);
+        if (sub) {
+          ctx.fillStyle = '#475569';
+          ctx.font = '18px system-ui, -apple-system, sans-serif';
+          ctx.fillText(sub, x + 22, y + 90);
         }
       };
 
-      drawRow('Cliente', `${q.clientName}${q.clientPhone ? ' · ' + q.clientPhone : ''}`);
-      drawRow('Equipo', q.device);
-      drawRow('Trabajo / Detalle', q.detail || 'Diagnóstico y reparación');
-      if (q.eta) drawRow('Demora estimada', q.eta);
-      if (q.warranty) drawRow('Garantía', q.warranty);
+      drawInfoCard(68, 228, 400, 112, 'CLIENTE', q.clientName, q.clientPhone || 'Sin teléfono');
+      drawInfoCard(492, 228, 400, 112, 'EQUIPO', q.device, `Orden #${q.orderNumber}`);
 
-      // Caja Total
+      // Bloque Trabajo / Detalle
+      ctx.fillStyle = '#f8fafc';
+      rrect(68, 364, 824, 176, 14);
+      ctx.fill();
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.stroke();
+      ctx.fillStyle = '#10b981';
+      rrect(68, 364, 6, 176, [14, 0, 0, 14]);
+      ctx.fill();
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+      ctx.fillText('TRABAJO / DETALLE DEL PRESUPUESTO', 94, 396);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '22px system-ui, -apple-system, sans-serif';
+      const words = String(q.detail || 'Diagnóstico y reparación').split(' ');
+      let line = '';
+      let ly = 434;
+      for (const w of words) {
+        const test = line ? line + ' ' + w : w;
+        if (ctx.measureText(test).width > 770) {
+          ctx.fillText(line, 94, ly);
+          ly += 32;
+          line = w;
+        } else {
+          line = test;
+        }
+      }
+      if (line) ctx.fillText(line, 94, ly);
+
+      // Demora y Garantía (2 columnas)
+      let nextY = 564;
+      if (q.eta || q.warranty) {
+        if (q.eta && q.warranty) {
+          drawInfoCard(68, nextY, 400, 88, 'DEMORA ESTIMADA', q.eta);
+          drawInfoCard(492, nextY, 400, 88, 'GARANTÍA', q.warranty);
+        } else if (q.eta) {
+          drawInfoCard(68, nextY, 824, 88, 'DEMORA ESTIMADA', q.eta);
+        } else {
+          drawInfoCard(68, nextY, 824, 88, 'GARANTÍA', q.warranty);
+        }
+        nextY += 112;
+      }
+
+      // Barra Total destacada
+      const totalY = Math.max(nextY + 8, 692);
       ctx.fillStyle = '#ecfdf5';
-      ctx.fillRect(68, 730, 764, 96);
+      rrect(68, totalY, 824, 112, 16);
+      ctx.fill();
       ctx.strokeStyle = '#10b981';
-      ctx.strokeRect(68, 730, 764, 96);
-      ctx.fillStyle = '#065f46';
-      ctx.font = 'bold 20px sans-serif';
-      ctx.fillText('TOTAL PRESUPUESTADO', 92, 768);
-      ctx.font = 'bold 38px sans-serif';
-      ctx.fillText(q.amountText, 92, 810);
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-      // Pie con link
+      ctx.fillStyle = '#065f46';
+      ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+      ctx.fillText('TOTAL PRESUPUESTADO', 98, totalY + 44);
+      ctx.fillStyle = '#047857';
+      ctx.font = '16px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Confirmar para iniciar la reparación', 98, totalY + 74);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#064e3b';
+      ctx.font = 'bold 46px system-ui, -apple-system, sans-serif';
+      ctx.fillText(q.amountText, 862, totalY + 72);
+      ctx.textAlign = 'left';
+
+      // Pie
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(68, 860);
+      ctx.lineTo(892, 860);
+      ctx.stroke();
+
       ctx.fillStyle = '#475569';
-      ctx.font = '18px sans-serif';
-      ctx.fillText(`Seguimiento online: ${q.fullTrackingUrl}`, 68, 875);
+      ctx.font = '16px system-ui, -apple-system, sans-serif';
+      ctx.fillText(`Seguimiento online: ${q.fullTrackingUrl}`, 68, 898);
+      ctx.textAlign = 'right';
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '16px sans-serif';
-      ctx.fillText(`Generado el ${new Date().toLocaleDateString('es-AR')} · TuTaller Soft`, 44, 965);
+      ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
+      ctx.fillText('TuTaller Soft', 892, 898);
+      ctx.textAlign = 'left';
 
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('No se pudo generar la imagen');
@@ -1172,37 +1275,90 @@ function openOrderDetailModal(order) {
   d.querySelector('#btn-quote-pdf')?.addEventListener('click', () => {
     const q = getQuoteData();
     if (!q) return;
-    const win = window.open('', '_blank', 'width=820,height=920');
+    const win = window.open('', '_blank', 'width=860,height=920');
     if (!win) {
       toast('Habilitá las ventanas emergentes para generar el PDF', true);
       return;
     }
+    const todayStr = new Date().toLocaleDateString('es-AR');
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Presupuesto Orden #${q.orderNumber}</title>
       <style>
-        body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#f1f5f9;color:#0f172a;padding:24px;}
-        .sheet{max-width:720px;margin:auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;}
-        .hdr{background:#059669;color:#fff;padding:24px 28px;display:flex;align-items:center;gap:16px;}
-        .hdr img{width:56px;height:56px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,0.15);padding:4px;}
-        .hdr h1{margin:0;font-size:22px;} .hdr p{margin:4px 0 0;opacity:.9;font-size:13px;}
-        .body{padding:26px 28px;} .row{margin-bottom:14px;} .lbl{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;}
-        .val{font-size:16px;margin-top:3px;} .total{background:#ecfdf5;border:1.5px solid #10b981;border-radius:10px;padding:16px 20px;margin-top:20px;}
-        .total strong{display:block;font-size:28px;color:#065f46;margin-top:4px;}
-        .ftr{margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;}
-        @media print{body{background:#fff;padding:0;}.sheet{border:none;}}
+        *{box-sizing:border-box;}
+        body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;background:#eef2f6;color:#0f172a;padding:28px 18px;}
+        .sheet{max-width:740px;margin:auto;background:#fff;border-radius:18px;overflow:hidden;border:1px solid #dbe3ec;box-shadow:0 18px 40px rgba(15,23,42,0.08);}
+        .hdr{background:linear-gradient(135deg,#047857 0%,#064e3b 100%);color:#fff;padding:26px 30px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;}
+        .hdr-left{display:flex;align-items:center;gap:16px;}
+        .hdr img{width:64px;height:64px;object-fit:contain;border-radius:14px;background:rgba(255,255,255,0.14);padding:5px;}
+        .hdr h1{margin:0;font-size:23px;letter-spacing:-0.01em;}
+        .hdr p{margin:4px 0 0;color:#a7f3d0;font-size:13.5px;}
+        .hdr-badge{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.22);border-radius:12px;padding:10px 16px;text-align:right;}
+        .hdr-badge .tag{font-size:11px;font-weight:700;letter-spacing:1px;color:#a7f3d0;text-transform:uppercase;}
+        .hdr-badge .ord{font-size:20px;font-weight:800;margin-top:2px;}
+        .hdr-badge .dt{font-size:12px;color:#d1fae5;margin-top:2px;}
+        .body{padding:26px 30px;}
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+        .card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;}
+        .card.accent{border-left:4px solid #10b981;margin-bottom:14px;}
+        .lbl{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.6px;}
+        .val{font-size:16px;font-weight:700;color:#0f172a;margin-top:4px;line-height:1.4;}
+        .sub{font-size:13.5px;color:#475569;margin-top:2px;}
+        .total{background:#ecfdf5;border:1.5px solid #10b981;border-radius:14px;padding:18px 22px;margin-top:18px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+        .total .t-lbl{font-size:12px;font-weight:800;color:#065f46;text-transform:uppercase;letter-spacing:.6px;}
+        .total .t-sub{font-size:13px;color:#047857;margin-top:3px;}
+        .total strong{font-size:32px;font-weight:900;color:#064e3b;letter-spacing:-0.02em;}
+        .ftr{margin-top:22px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12.5px;color:#64748b;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+        @media (max-width:560px){.grid-2{grid-template-columns:1fr;}.hdr-badge{text-align:left;}}
+        @media print{body{background:#fff;padding:0;}.sheet{border:none;box-shadow:none;}}
       </style></head><body>
       <div class="sheet">
         <div class="hdr">
-          <img src="${esc(q.logoUrl)}" alt="Logo">
-          <div><h1>${esc(q.workshopName)}</h1><p>${esc([q.workshopPhone, q.workshopAddress].filter(Boolean).join(' · '))}</p><p><strong>PRESUPUESTO · ORDEN #${q.orderNumber}</strong></p></div>
+          <div class="hdr-left">
+            <img src="${esc(q.logoUrl)}" alt="Logo">
+            <div>
+              <h1>${esc(q.workshopName)}</h1>
+              <p>${esc([q.workshopPhone, q.workshopAddress].filter(Boolean).join(' · ') || 'Servicio Técnico Especializado')}</p>
+            </div>
+          </div>
+          <div class="hdr-badge">
+            <div class="tag">Presupuesto</div>
+            <div class="ord">Orden #${q.orderNumber}</div>
+            <div class="dt">${todayStr}</div>
+          </div>
         </div>
         <div class="body">
-          <div class="row"><div class="lbl">Cliente</div><div class="val">${esc(q.clientName)}${q.clientPhone ? ' · ' + esc(q.clientPhone) : ''}</div></div>
-          <div class="row"><div class="lbl">Equipo</div><div class="val">${esc(q.device)}</div></div>
-          <div class="row"><div class="lbl">Trabajo / Detalle</div><div class="val">${esc(q.detail || 'Diagnóstico y reparación')}</div></div>
-          ${q.eta ? `<div class="row"><div class="lbl">Demora estimada</div><div class="val">${esc(q.eta)}</div></div>` : ''}
-          ${q.warranty ? `<div class="row"><div class="lbl">Garantía</div><div class="val">${esc(q.warranty)}</div></div>` : ''}
-          <div class="total"><div class="lbl" style="color:#065f46;">Total presupuestado</div><strong>${esc(q.amountText)}</strong></div>
-          <div class="ftr">Seguimiento online: ${esc(q.fullTrackingUrl)}<br>Fecha: ${new Date().toLocaleDateString('es-AR')}</div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="lbl">Cliente</div>
+              <div class="val">${esc(q.clientName)}</div>
+              <div class="sub">${esc(q.clientPhone || 'Sin teléfono')}</div>
+            </div>
+            <div class="card">
+              <div class="lbl">Equipo</div>
+              <div class="val">${esc(q.device)}</div>
+              <div class="sub">Orden #${q.orderNumber}</div>
+            </div>
+          </div>
+          <div class="card accent">
+            <div class="lbl">Trabajo / Detalle del presupuesto</div>
+            <div class="val" style="font-weight:500;">${esc(q.detail || 'Diagnóstico y reparación')}</div>
+          </div>
+          ${(q.eta || q.warranty) ? `
+            <div class="grid-2">
+              ${q.eta ? `<div class="card"><div class="lbl">Demora estimada</div><div class="val">${esc(q.eta)}</div></div>` : ''}
+              ${q.warranty ? `<div class="card"><div class="lbl">Garantía</div><div class="val">${esc(q.warranty)}</div></div>` : ''}
+            </div>
+          ` : ''}
+          <div class="total">
+            <div>
+              <div class="t-lbl">Total presupuestado</div>
+              <div class="t-sub">Confirmar para iniciar la reparación</div>
+            </div>
+            <strong>${esc(q.amountText)}</strong>
+          </div>
+          <div class="ftr">
+            <span>Seguimiento online: ${esc(q.fullTrackingUrl)}</span>
+            <strong style="color:#94a3b8;">TuTaller Soft</strong>
+          </div>
         </div>
       </div>
       <script>window.onload=()=>{setTimeout(()=>window.print(),250);};</script></body></html>`);

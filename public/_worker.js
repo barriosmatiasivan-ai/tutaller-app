@@ -950,8 +950,13 @@ export default {
       if (subRoute === 'cash/history' && request.method === 'GET') {
         const offset = Number(url.searchParams.get('offset') || 0);
         if (!Number.isSafeInteger(offset) || offset < 0) return json({error:'Página inválida'},400);
-        const rows = await db.prepare(`SELECT id, amount_cents/100.0 AS amount, kind AS type, payment_method, notes AS concept, created_at
-          FROM cash_entries WHERE workshop_id=? ORDER BY created_at DESC,id DESC LIMIT 50 OFFSET ?`).bind(workshop.id,offset).all();
+        const rows = await db.prepare(`
+          SELECT ce.id, ce.amount_cents/100.0 AS amount, ce.kind AS type, ce.payment_method, ce.notes AS concept, ce.order_id,
+                 ro.order_number, ro.brand AS order_brand, ro.model AS order_model, ce.created_at
+          FROM cash_entries ce
+          LEFT JOIN repair_orders ro ON ce.order_id = ro.id AND ro.workshop_id = ce.workshop_id
+          WHERE ce.workshop_id=? ORDER BY ce.created_at DESC, ce.id DESC LIMIT 50 OFFSET ?
+        `).bind(workshop.id,offset).all();
         return json({entries:rows.results});
       }
 
@@ -975,8 +980,11 @@ export default {
             COALESCE(SUM(CASE WHEN kind='income' AND payment_method='mercadopago' THEN amount_cents ELSE 0 END),0)/100.0 AS mp
             FROM cash_entries WHERE workshop_id=?`).bind(workshop.id).first(),
           db.prepare(`
-            SELECT id, workshop_id, (CAST(amount_cents AS REAL) / 100) as amount, kind as type, payment_method, notes as concept, created_at 
-            FROM cash_entries WHERE workshop_id = ? ORDER BY created_at DESC,id DESC LIMIT 50
+            SELECT ce.id, ce.workshop_id, (CAST(ce.amount_cents AS REAL) / 100) as amount, ce.kind as type, ce.payment_method, ce.notes as concept, ce.order_id,
+                   ro.order_number, ro.brand as order_brand, ro.model as order_model, ce.created_at 
+            FROM cash_entries ce
+            LEFT JOIN repair_orders ro ON ce.order_id = ro.id AND ro.workshop_id = ce.workshop_id
+            WHERE ce.workshop_id = ? ORDER BY ce.created_at DESC, ce.id DESC LIMIT 50
           `).bind(workshop.id).all()
         ]);
 
@@ -1200,26 +1208,50 @@ export default {
       if (subRoute === 'cash' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));
         const amountCents = Math.round(Number(body.amount || 0) * 100);
+        if (!Number.isFinite(amountCents) || amountCents <= 0) {
+          return json({ error: 'Ingresá un importe mayor a 0.' }, 400);
+        }
         const kind = body.type === 'out' || body.type === 'expense' ? 'expense' : 'income';
         const method = body.payment_method || 'efectivo';
-        const notes = body.concept || 'Movimiento de caja';
+        const orderId = typeof body.order_id === 'string' && body.order_id.trim() ? body.order_id.trim() : null;
+        let linkedOrder = null;
+        if (orderId) {
+          linkedOrder = await db.prepare('SELECT id, order_number, brand, model FROM repair_orders WHERE id = ? AND workshop_id = ?').bind(orderId, workshop.id).first();
+          if (!linkedOrder) return json({ error: 'Orden no encontrada en este taller.' }, 404);
+        }
+        const defaultNote = linkedOrder
+          ? `${kind === 'income' ? 'Cobro' : 'Egreso'} Orden #${linkedOrder.order_number} (${linkedOrder.brand} ${linkedOrder.model})`
+          : 'Movimiento de caja';
+        const notes = (typeof body.concept === 'string' && body.concept.trim()) ? body.concept.trim().slice(0, 300) : defaultNote;
         const nowIso = new Date().toISOString();
         const entryId = crypto.randomUUID();
         const accountId = `acc-${workshop.id}`;
 
-        await db.batch([
+        const statements = [
           db.prepare(`
             INSERT OR IGNORE INTO finance_accounts (id, workshop_id, direction, total_cents, cost_cents, created_at)
             VALUES (?, ?, 'receivable', ?, 0, ?)
           `).bind(accountId, workshop.id, amountCents, nowIso),
 
           db.prepare(`
-            INSERT INTO cash_entries (id, workshop_id, account_id, amount_cents, kind, payment_method, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(entryId, workshop.id, accountId, amountCents, kind, method, notes, nowIso)
-        ]);
+            INSERT INTO cash_entries (id, workshop_id, account_id, amount_cents, kind, payment_method, notes, order_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(entryId, workshop.id, accountId, amountCents, kind, method, notes, orderId, nowIso)
+        ];
 
-        return json({ success: true, id: entryId }, 201);
+        if (orderId && kind === 'income') {
+          statements.push(
+            db.prepare(`
+              UPDATE repair_orders
+              SET paid_cents = COALESCE(paid_cents, 0) + ?, updated_at = ?
+              WHERE id = ? AND workshop_id = ?
+            `).bind(amountCents, nowIso, orderId, workshop.id)
+          );
+        }
+
+        await db.batch(statements);
+
+        return json({ success: true, id: entryId, order_id: orderId }, 201);
       }
     }
 

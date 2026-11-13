@@ -858,11 +858,19 @@ function orderCardHtml(order) {
     ? `https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${clientName}! Te compartimos el enlace de seguimiento de tu ${order.brand || ''} ${order.model || 'equipo'} (Orden #${order.order_number}) en ${currentWorkshop?.name || 'el taller'} (estado: ${st.label}):\n${fullTrackingUrl}`)}`
     : trackingUrl;
   const total = Number(order.total_cost || 0);
-  const saldo = Number(order.balance_cents || 0) / 100;
+  const paid = Number(order.paid_cents || 0) / 100;
+  const saldo = Math.max(0, total - paid);
   const initials = clientInitials(clientName);
-  const financeBadgeHtml = saldo > 0
-    ? `<span class="order-finance-badge has-debt">Saldo: ${formatMoney(saldo)}</span>`
-    : (total > 0 ? `<span class="order-finance-badge" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Presup.: ${formatMoney(total)}</span>` : '');
+  let financeBadgeHtml = '';
+  if (total > 0 && paid >= total) {
+    financeBadgeHtml = `<span class="order-finance-badge" style="background:rgba(16,185,129,0.16);color:#34d399;border:1px solid rgba(16,185,129,0.35);">✓ Pagado (${formatMoney(total)})</span>`;
+  } else if (paid > 0 && saldo > 0) {
+    financeBadgeHtml = `<span class="order-finance-badge has-debt">Saldo: ${formatMoney(saldo)}</span>`;
+  } else if (total > 0) {
+    financeBadgeHtml = `<span class="order-finance-badge" style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.28);">Presup.: ${formatMoney(total)}</span>`;
+  } else if (paid > 0) {
+    financeBadgeHtml = `<span class="order-finance-badge" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Abonado: ${formatMoney(paid)}</span>`;
+  }
 
   return `
     <div class="order-card-enhanced" data-order-id="${order.id}">
@@ -966,7 +974,15 @@ function openOrderDetailModal(order) {
       </form>
 
       <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);">
-        <label>Presupuesto e importe</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <label style="margin:0;">Presupuesto e importe</label>
+          ${(Number(order.total_cost || 0) > 0 || Number(order.paid_cents || 0) > 0) ? `
+            <span class="muted" style="font-size:12.5px;">
+              Abonado: <strong style="color:#34d399;">${formatMoney(Number(order.paid_cents || 0) / 100)}</strong>
+              ${Number(order.total_cost || 0) > 0 ? ` · Saldo: <strong style="color:${Math.max(0, Number(order.total_cost || 0) - Number(order.paid_cents || 0) / 100) > 0 ? '#fbbf24' : '#34d399'};">${formatMoney(Math.max(0, Number(order.total_cost || 0) - Number(order.paid_cents || 0) / 100))}</strong>` : ''}
+            </span>
+          ` : ''}
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
           <input type="text" id="quote-detail" placeholder="Trabajo / repuesto (ej: Cambio de módulo)" value="${esc(order.quote_detail || order.public_diagnosis || order.fault || '')}" style="grid-column:1 / -1;">
           <input type="number" id="quote-amount" min="0" step="any" placeholder="Importe total ($)" value="${Number(order.total_cost || 0) > 0 ? Number(order.total_cost) : ''}">
@@ -975,6 +991,7 @@ function openOrderDetailModal(order) {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
           <button type="button" class="primary compact" id="btn-save-quote">💾 Guardar importe</button>
+          <button type="button" class="primary compact" id="btn-order-charge" style="background:#059669;">💵 Cobrar</button>
           ${order.client_phone ? `
             <button type="button" class="secondary compact" id="btn-send-quote-wa">💬 Enviar (wa.me)</button>
             <button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>
@@ -1118,6 +1135,14 @@ function openOrderDetailModal(order) {
     } finally {
       saveQuoteBtn.disabled = false;
     }
+  });
+
+  d.querySelector('#btn-order-charge')?.addEventListener('click', async () => {
+    const rawAmt = Number(d.querySelector('#quote-amount')?.value || 0);
+    if (rawAmt > 0 && rawAmt !== Number(order.total_cost || 0)) {
+      try { await saveOrderQuote(true); } catch (e) {}
+    }
+    openNewCashModal(order);
   });
 
   d.querySelector('#btn-send-quote-wa')?.addEventListener('click', () => {
@@ -1596,7 +1621,7 @@ function renderCash() {
         <p class="muted">
           ${new Date(e.created_at).toLocaleDateString('es-AR')} &bull; 
           <span style="text-transform:capitalize;">${esc(e.payment_method || 'Efectivo')}</span> &bull; 
-          ${e.type === 'income' ? 'Ingreso' : 'Egreso'}
+          ${e.type === 'income' ? 'Ingreso' : 'Egreso'}${e.order_number ? ` &bull; <span style="color:#34d399;">📱 Orden #${e.order_number} (${esc(e.order_brand || '')} ${esc(e.order_model || '')})</span>` : ''}
         </p>
       </div>
       <div class="cash-row-amount">
@@ -1803,17 +1828,37 @@ function openNewClientModal() {
 }
 
 // Modal nuevo movimiento de caja
-function openNewCashModal() {
-  const d = modal('＋ Nuevo movimiento de caja', `
+function openNewCashModal(presetOrder = null) {
+  const preset = presetOrder && presetOrder.id ? presetOrder : null;
+  const orders = workshopData.orders || [];
+  const orderOptions = orders.map(o => {
+    const total = Number(o.total_cost || 0);
+    const paid = Number(o.paid_cents || 0) / 100;
+    const saldo = Math.max(0, total - paid);
+    const extra = total > 0
+      ? (saldo > 0 ? ` · Saldo ${formatMoney(saldo)}` : ' · Pagado')
+      : '';
+    return `<option value="${o.id}" ${preset && String(preset.id) === String(o.id) ? 'selected' : ''}>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)} (${esc(o.client_name || 'Sin cliente')})${extra}</option>`;
+  }).join('');
+
+  const modalTitle = preset ? `💵 Cobrar Orden #${preset.order_number}` : '＋ Nuevo movimiento de caja';
+  const d = modal(modalTitle, `
     <form id="new-cash-form" class="form-grid">
+      <label class="wide">Equipo / Orden vinculada (opcional)
+        <select name="order_id" id="cash-order-select">
+          <option value="">Sin equipo vinculado (movimiento general)</option>
+          ${orderOptions}
+        </select>
+        <small class="muted" id="cash-order-summary" style="display:none;margin-top:4px;"></small>
+      </label>
       <label>Tipo de movimiento
-        <select name="type">
+        <select name="type" id="cash-type-select">
           <option value="income">Ingreso (Cobro / Seña / Venta)</option>
           <option value="expense">Egreso (Gasto / Pago repuesto)</option>
         </select>
       </label>
       <label>Importe ($)
-        <input name="amount" type="number" step="0.01" min="1" required placeholder="Ej: 15000">
+        <input name="amount" id="cash-amount-input" type="number" step="0.01" min="1" required placeholder="Ej: 15000">
       </label>
       <label>Medio de pago
         <select name="payment_method">
@@ -1824,7 +1869,7 @@ function openNewCashModal() {
         </select>
       </label>
       <label>Concepto o descripción
-        <input name="concept" required placeholder="Ej: Cobro pantalla Motorola G84">
+        <input name="concept" id="cash-concept-input" required placeholder="Ej: Cobro pantalla Motorola G84">
       </label>
       <div class="form-actions wide">
         <button type="submit" class="primary">Registrar movimiento</button>
@@ -1833,6 +1878,41 @@ function openNewCashModal() {
   `);
 
   if (!d) return;
+
+  const orderSel = d.querySelector('#cash-order-select');
+  const summaryEl = d.querySelector('#cash-order-summary');
+  const amountInp = d.querySelector('#cash-amount-input');
+  const conceptInp = d.querySelector('#cash-concept-input');
+  const typeSel = d.querySelector('#cash-type-select');
+
+  const syncOrderSelection = (forceFill = false) => {
+    const selectedId = orderSel?.value;
+    const ord = orders.find(o => String(o.id) === String(selectedId));
+    if (!ord) {
+      if (summaryEl) summaryEl.style.display = 'none';
+      return;
+    }
+    const total = Number(ord.total_cost || 0);
+    const paid = Number(ord.paid_cents || 0) / 100;
+    const saldo = Math.max(0, total - paid);
+    if (summaryEl) {
+      summaryEl.style.display = 'block';
+      summaryEl.innerHTML = total > 0
+        ? `Presupuesto: <strong>${formatMoney(total)}</strong> · Abonado: <strong style="color:#34d399;">${formatMoney(paid)}</strong> · Saldo pendiente: <strong style="color:${saldo > 0 ? '#fbbf24' : '#34d399'};">${formatMoney(saldo)}</strong> (podés cobrar parcial o total)`
+        : `Orden sin presupuesto cargado · Abonado hasta ahora: <strong style="color:#34d399;">${formatMoney(paid)}</strong>`;
+    }
+    if (typeSel?.value === 'income') {
+      if ((forceFill || !amountInp.value) && saldo > 0) {
+        amountInp.value = saldo;
+      }
+      if (forceFill || !conceptInp.value) {
+        conceptInp.value = `Cobro Orden #${ord.order_number} (${ord.brand} ${ord.model})`;
+      }
+    }
+  };
+
+  orderSel?.addEventListener('change', () => syncOrderSelection(true));
+  if (preset) syncOrderSelection(true);
 
   d.querySelector('#new-cash-form')?.addEventListener('submit', async e => {
     e.preventDefault();

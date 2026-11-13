@@ -1014,6 +1014,7 @@ function openOrderDetailModal(order) {
           <button type="button" class="primary compact" id="btn-save-quote">💾 Guardar importe</button>
           <button type="button" class="primary compact" id="btn-order-charge" style="background:#059669;">💵 Cobrar</button>
           <button type="button" class="secondary compact" id="btn-order-need-part">🛒 Faltante</button>
+          <button type="button" class="secondary compact" id="btn-order-use-stock">📦 Usar stock</button>
           ${order.client_phone ? `
             <button type="button" class="secondary compact" id="btn-send-quote-wa">💬 Enviar (wa.me)</button>
             ${isBotEnabledForWorkshop() ? `<button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>` : ''}
@@ -1170,7 +1171,11 @@ function openOrderDetailModal(order) {
   });
 
   d.querySelector('#btn-order-need-part')?.addEventListener('click', () => {
-    openNewStockModal({ presetOrder: order });
+    openNewStockModal({ presetOrder: order, forceMode: 'purchase' });
+  });
+
+  d.querySelector('#btn-order-use-stock')?.addEventListener('click', () => {
+    openNewStockModal({ presetOrder: order, forceMode: 'stock' });
   });
 
   d.querySelector('#btn-send-quote-wa')?.addEventListener('click', () => {
@@ -2215,6 +2220,7 @@ function openNewStockModal(editOrOpts = null) {
   const isEdit = Boolean(editOrOpts && editOrOpts.id && !editOrOpts.presetOrder);
   const item = isEdit ? editOrOpts : null;
   const presetOrder = editOrOpts && editOrOpts.presetOrder ? editOrOpts.presetOrder : null;
+  const forceMode = editOrOpts && editOrOpts.forceMode ? editOrOpts.forceMode : null;
   const categories = ['Pantallas / Módulos', 'Baterías', 'Pines de carga', 'Fundas / Vidrios', 'Cargadores / Cables', 'Herramientas', 'General'];
 
   if (isEdit) {
@@ -2274,20 +2280,28 @@ function openNewStockModal(editOrOpts = null) {
   const orderOptions = orders.map(o =>
     `<option value="${o.id}" ${presetOrder && String(presetOrder.id) === String(o.id) ? 'selected' : ''}>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)} (${esc(o.client_name || 'Sin cliente')})</option>`
   ).join('');
-  const defaultDest = presetOrder ? 'purchase' : 'stock';
+  const defaultDest = forceMode || (presetOrder ? 'purchase' : 'stock');
   const availableStock = (workshopData.stock || []).filter(s => Number(s.quantity || 0) > 0);
   const existingStockOptions = availableStock.length
     ? availableStock.map(s => `<option value="${s.id}" data-qty="${Number(s.quantity || 0)}">${esc(s.name)} — Disp: ${Number(s.quantity || 0)}${s.compatible_models ? ` (${esc(s.compatible_models)})` : ''}</option>`).join('')
     : '<option value="">No hay repuestos disponibles en stock (cantidad > 0)</option>';
 
-  const d = modal(presetOrder ? `🛒 Anotar faltante · Orden #${presetOrder.order_number}` : '＋ Nuevo producto / repuesto', `
+  const modalTitle = presetOrder
+    ? (defaultDest === 'stock'
+      ? `📦 Usar repuesto en stock · Orden #${presetOrder.order_number}`
+      : `🛒 Anotar faltante · Orden #${presetOrder.order_number}`)
+    : '＋ Nuevo producto / repuesto';
+
+  const d = modal(modalTitle, `
     <form id="new-stock-form" class="form-grid">
-      <label class="wide">¿Dónde querés cargarlo?
-        <select name="dest" id="stock-dest-select">
-          <option value="stock" ${defaultDest === 'stock' ? 'selected' : ''}>📦 Stock disponible en el taller</option>
-          <option value="purchase" ${defaultDest === 'purchase' ? 'selected' : ''}>🛒 Lista de compras (Faltante / Para pedir)</option>
-        </select>
-      </label>
+      ${forceMode
+        ? `<input type="hidden" name="dest" id="stock-dest-select" value="${defaultDest}">`
+        : `<label class="wide">¿Dónde querés cargarlo?
+            <select name="dest" id="stock-dest-select">
+              <option value="stock" ${defaultDest === 'stock' ? 'selected' : ''}>📦 Stock disponible en el taller</option>
+              <option value="purchase" ${defaultDest === 'purchase' ? 'selected' : ''}>🛒 Lista de compras (Faltante / Para pedir)</option>
+            </select>
+          </label>`}
 
       <label class="wide" id="order-existing-stock-wrap" style="display:none;">Repuesto en stock disponible
         <select name="existing_stock_id" id="order-existing-stock-select">

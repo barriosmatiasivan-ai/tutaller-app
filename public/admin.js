@@ -80,7 +80,7 @@ async function api(path, options = {}) {
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.error || 'Error en la solicitud');
+    throw new Error(data.error || `Error en la solicitud (HTTP ${res.status})`);
   }
   return data;
 }

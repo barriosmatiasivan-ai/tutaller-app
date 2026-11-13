@@ -1509,7 +1509,27 @@ function openOrderDetailModal(order) {
       renderCurrentSection();
 
       if (newStatus === 'ready') {
-        triggerAutoWhatsApp(order, 'ready');
+        if (isBotEnabledForWorkshop()) {
+          triggerAutoWhatsApp(order, 'ready');
+        } else if (order.client_phone) {
+          const waPhone = formatWaMePhone(order.client_phone);
+          const total = Number(order.total_cost || 0);
+          const paid = Number(order.paid_cents || 0) / 100;
+          const saldo = Math.max(0, total - paid);
+          const saldoLine = saldo > 0 ? `\nSaldo a abonar al retirar: ${formatMoney(saldo)}` : '';
+          const readyMsg = `Hola ${clientName}! Te avisamos de ${currentWorkshop?.name || 'el taller'} que tu ${order.brand || ''} ${order.model || 'equipo'} (Orden #${order.order_number}) ya está LISTO PARA RETIRAR.${saldoLine}\n\nPodés ver el detalle en tu enlace de seguimiento:\n${location.origin}${trackingUrl}`;
+          const promptDlg = modal('✅ Equipo listo para retirar', `
+            <p style="margin-top:0;">¿Querés avisarle ahora por WhatsApp a <strong>${esc(clientName)}</strong> que su <strong>${esc(order.brand || '')} ${esc(order.model || 'equipo')}</strong> (Orden #${order.order_number}) ya está listo para retirar?</p>
+            <div class="form-actions" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+              <button type="button" class="secondary" id="btn-ready-skip">Ahora no</button>
+              <a class="primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;" id="btn-ready-send-wa" href="https://wa.me/${waPhone}?text=${encodeURIComponent(readyMsg)}" target="_blank" rel="noopener noreferrer">
+                💬 Avisar por WhatsApp
+              </a>
+            </div>
+          `);
+          promptDlg?.querySelector('#btn-ready-skip')?.addEventListener('click', () => promptDlg.close());
+          promptDlg?.querySelector('#btn-ready-send-wa')?.addEventListener('click', () => promptDlg.close());
+        }
       } else if (newStatus === 'delivered') {
         triggerAutoWhatsApp(order, 'delivered');
       }

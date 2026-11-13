@@ -1137,16 +1137,21 @@ export default {
         }
 
 
+        const rawCost = body.total_cost === '' || body.total_cost == null ? 0 : Number(body.total_cost);
+        if (!Number.isFinite(rawCost) || rawCost < 0 || rawCost > 1000000000) {
+          return json({ error: 'Importe inválido.' }, 400);
+        }
+
         const intakeKey = crypto.randomUUID().slice(0, 12);
 
         statements.push(db.prepare(`
-          INSERT INTO repair_orders (id, workshop_id, client_id, order_number, brand, model, identifier, fault, condition, accessories, status, intake_key, version, created_at, updated_at)
-          VALUES (?, ?, ?, (SELECT COALESCE(MAX(order_number),0)+1 FROM repair_orders WHERE workshop_id=?), ?, ?, ?, ?, ?, ?, 'received', ?, 1, ?, ?) RETURNING order_number
+          INSERT INTO repair_orders (id, workshop_id, client_id, order_number, brand, model, identifier, fault, condition, accessories, total_cost, status, intake_key, version, created_at, updated_at)
+          VALUES (?, ?, ?, (SELECT COALESCE(MAX(order_number),0)+1 FROM repair_orders WHERE workshop_id=?), ?, ?, ?, ?, ?, ?, ?, 'received', ?, 1, ?, ?) RETURNING order_number
         `).bind(
           orderId, workshop.id, clientId, workshop.id,
           body.brand || '', body.model || '', body.identifier || '',
           body.fault || '', body.condition || '', body.accessories || '',
-          intakeKey, nowIso, nowIso
+          rawCost, intakeKey, nowIso, nowIso
         ));
         let inserted;
         try {

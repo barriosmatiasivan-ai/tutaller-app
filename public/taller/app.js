@@ -1657,13 +1657,8 @@ function openNewOrderModal() {
       <label>IMEI o N° de Serie (opcional)
         <input name="identifier" placeholder="15 dígitos">
       </label>
-      <label>Medio de cobro preferido
-        <select name="payment_method">
-          <option value="efectivo">Efectivo</option>
-          <option value="mercadopago">Mercado Pago</option>
-          <option value="transferencia">Transferencia bancaria</option>
-          <option value="tarjeta">Tarjeta</option>
-        </select>
+      <label>Importe / Presupuesto (opcional)
+        <input name="total_cost" type="number" min="0" step="any" placeholder="Ej: 45000">
       </label>
 
       <div class="form-actions">

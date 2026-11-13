@@ -375,6 +375,7 @@ async function openWaQrModal() {
   if (connEl) connEl.style.display = 'none';
   if (errEl) errEl.style.display = 'none';
 
+  enableDialogBackdropClose(dlg);
   dlg.showModal();
 
   if (waQrPollInterval) clearInterval(waQrPollInterval);

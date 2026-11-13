@@ -405,9 +405,19 @@
               <label>Dirección física
                 <input name="address" id="set-workshop-address" maxlength="150">
               </label>
-              <label class="wide">URL de tu Logo (dejar en blanco para usar el predeterminado)
-                <input name="logo_url" id="set-workshop-logo-url" placeholder="https://ejemplo.com/logo.png">
-              </label>
+              <div class="wide">
+                <span style="display:block;font-size:13px;font-weight:600;margin-bottom:8px;">Logo del taller</span>
+                <input type="hidden" name="logo_url" id="set-workshop-logo-url">
+                <input type="file" id="set-workshop-logo-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+                <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                  <img id="set-workshop-logo-preview" src="/logo.png" alt="Logo del taller" style="width:56px;height:56px;object-fit:contain;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.25);padding:4px;">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <button type="button" class="secondary" id="btn-upload-workshop-logo">📁 Subir logo desde tu dispositivo</button>
+                    <button type="button" class="secondary" id="btn-remove-workshop-logo" style="display:none;color:#ef4444;border-color:rgba(239,68,68,0.35);">Quitar logo</button>
+                  </div>
+                </div>
+                <small class="muted" style="display:block;margin-top:6px;">PNG, JPG o WEBP (máx. 4 MB). Se guarda automáticamente al elegir la imagen.</small>
+              </div>
               <div class="form-actions">
                 <button type="submit" class="primary">Guardar datos de marca</button>
               </div>

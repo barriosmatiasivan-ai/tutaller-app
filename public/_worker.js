@@ -694,6 +694,20 @@ export default {
         });
       }
 
+      // 1b. Servir logo subido a R2 (público para pantalla de login y seguimiento)
+      if (subRoute === 'logo' && request.method === 'GET') {
+        if (!env.FILES) return json({ error: 'Almacenamiento no disponible' }, 503);
+        const object = await env.FILES.get(`logos/${workshop.id}`);
+        if (!object) return json({ error: 'Logo no encontrado' }, 404);
+        return new Response(object.body, {
+          headers: {
+            'Content-Type': object.httpMetadata?.contentType || 'image/png',
+            'Cache-Control': 'public, max-age=3600',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+
       // 2. Auth: Solicitar PIN de acceso
       if (subRoute === 'auth/request-pin' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));
@@ -1058,13 +1072,43 @@ export default {
 
       if (subRoute === 'brand' && request.method === 'PUT') {
         const {name, phone, address='', logo_url=''} = await request.json();
-        if (!name?.trim() || !phone?.trim() || (logo_url && !/^https:\/\//i.test(logo_url))) return json({error:'Revisá nombre, teléfono y URL HTTPS del logo.'},400);
+        const validLogo = !logo_url || /^https:\/\//i.test(logo_url) || logo_url.startsWith('/api/workshop/');
+        if (!name?.trim() || !phone?.trim() || !validLogo) return json({error:'Revisá nombre, teléfono y logo.'},400);
         const now = new Date().toISOString();
         await db.batch([
           db.prepare('UPDATE workshops SET name=?, phone=?, address=?, updated_at=? WHERE id=?').bind(name,phone,address,now,workshop.id),
           db.prepare('UPDATE workshop_settings SET name=?, phone=?, address=?, logo_url=?, updated_at=? WHERE workshop_id=?').bind(name,phone,address,logo_url,now,workshop.id)
         ]);
         return json({success:true});
+      }
+
+      if (subRoute === 'logo' && request.method === 'POST') {
+        if (!env.FILES) return json({ error: 'Almacenamiento de archivos no disponible.' }, 503);
+        let form;
+        try {
+          form = await request.formData();
+        } catch {
+          return json({ error: 'Formato de carga inválido.' }, 400);
+        }
+        const file = form.get('logo');
+        if (!file || typeof file.arrayBuffer !== 'function' || file.size <= 0) {
+          return json({ error: 'Seleccioná una imagen para el logo.' }, 400);
+        }
+        const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+        if (!allowedTypes.has(file.type)) {
+          return json({ error: 'Formato no permitido. Usá PNG, JPG, WEBP o GIF.' }, 415);
+        }
+        if (file.size > 4 * 1024 * 1024) {
+          return json({ error: 'El logo debe pesar como máximo 4 MB.' }, 413);
+        }
+        await env.FILES.put(`logos/${workshop.id}`, file.stream(), {
+          httpMetadata: { contentType: file.type }
+        });
+        const logoUrl = `/api/workshop/${encodeURIComponent(workshop.slug)}/logo?v=${Date.now()}`;
+        const now = new Date().toISOString();
+        await db.prepare('UPDATE workshop_settings SET logo_url=?, updated_at=? WHERE workshop_id=?')
+          .bind(logoUrl, now, workshop.id).run();
+        return json({ success: true, logo_url: logoUrl });
       }
 
       // 5. Crear orden

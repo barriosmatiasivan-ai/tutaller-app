@@ -1163,7 +1163,12 @@ function renderSettings() {
   setVal('#set-workshop-name', currentWorkshop?.name);
   setVal('#set-workshop-phone', currentWorkshop?.phone);
   setVal('#set-workshop-address', currentWorkshop?.address);
-  setVal('#set-workshop-logo-url', currentSettings?.logo_url);
+  const logoUrl = currentSettings?.logo_url || '';
+  setVal('#set-workshop-logo-url', logoUrl);
+  const logoPreview = document.querySelector('#set-workshop-logo-preview');
+  if (logoPreview) logoPreview.src = logoUrl || '/logo.png';
+  const btnRemoveLogo = document.querySelector('#btn-remove-workshop-logo');
+  if (btnRemoveLogo) btnRemoveLogo.style.display = logoUrl ? 'inline-block' : 'none';
 
   const country = (currentWorkshop?.country || 'AR').toUpperCase();
   setVal('#set-workshop-country', country);
@@ -1492,6 +1497,64 @@ function initEvents() {
       await loadWorkshop();
       toast('Datos de marca guardados');
     } catch (err) { toast(err.message, true); }
+  });
+
+  // Subir o quitar logo desde el dispositivo
+  const logoFileInput = document.querySelector('#set-workshop-logo-file');
+  const btnUploadLogo = document.querySelector('#btn-upload-workshop-logo');
+  const btnRemoveLogo = document.querySelector('#btn-remove-workshop-logo');
+
+  btnUploadLogo?.addEventListener('click', () => {
+    if (logoFileInput) {
+      logoFileInput.value = '';
+      logoFileInput.click();
+    }
+  });
+
+  logoFileInput?.addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const prevText = btnUploadLogo.textContent;
+    btnUploadLogo.disabled = true;
+    btnUploadLogo.textContent = 'Subiendo...';
+    try {
+      const fd = new FormData();
+      fd.append('logo', file);
+      const token = getWorkshopToken();
+      const res = await fetch(`/api/workshop/${currentSlug}/logo`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'No se pudo subir el logo');
+      if (currentSettings) currentSettings.logo_url = data.logo_url;
+      if (currentWorkshop) currentWorkshop.logo_url = data.logo_url;
+      await loadWorkshop();
+      toast('¡Logo actualizado con éxito!');
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      btnUploadLogo.disabled = false;
+      btnUploadLogo.textContent = prevText;
+    }
+  });
+
+  btnRemoveLogo?.addEventListener('click', async () => {
+    const hiddenInput = document.querySelector('#set-workshop-logo-url');
+    if (hiddenInput) hiddenInput.value = '';
+    const form = document.querySelector('#form-settings-brand');
+    if (!form) return;
+    try {
+      await api(`/api/workshop/${currentSlug}/brand`, {
+        method: 'PUT',
+        body: JSON.stringify(Object.fromEntries(new FormData(form)))
+      });
+      await loadWorkshop();
+      toast('Logo restablecido al predeterminado');
+    } catch (err) {
+      toast(err.message, true);
+    }
   });
 
   // Guardar medios de pago desde Configuración

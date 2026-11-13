@@ -443,13 +443,25 @@ async function disconnectWaBot() {
 
 async function sendWaBotMessage(phone, message) {
   const cfg = getWaBotConfig();
-  if (!cfg.url || !phone) return null;
+  if (!phone) return null;
+
+  const defaultBotUrl = 'https://tutaller-app-production.up.railway.app';
+  const normalizedUrl = (cfg.url || '').replace(/\/+$/, '');
+  const useServerProxy = !cfg.apiKey && (!normalizedUrl || normalizedUrl === defaultBotUrl);
 
   try {
+    if (useServerProxy) {
+      return await api(`/api/workshop/${currentSlug}/bot/send`, {
+        method: 'POST',
+        body: JSON.stringify({ phone, message })
+      });
+    }
+
+    if (!normalizedUrl) return null;
     const headers = { 'Content-Type': 'application/json' };
     if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
 
-    const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/api/send`, {
+    const res = await fetch(`${normalizedUrl}/api/send`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ phone, message })
@@ -462,13 +474,12 @@ async function sendWaBotMessage(phone, message) {
     return await res.json();
   } catch (err) {
     console.warn('No se pudo enviar WhatsApp bot:', err);
-    return null;
+    return { success: false, error: err?.message || 'Error al enviar WhatsApp' };
   }
 }
 
 async function triggerAutoWhatsApp(order, type) {
   const cfg = getWaBotConfig();
-  if (!cfg.url) return;
 
   if (type === 'intake' && !cfg.autoIntake) return;
   if (type === 'ready' && !cfg.autoReady) return;
@@ -495,6 +506,8 @@ async function triggerAutoWhatsApp(order, type) {
   const result = await sendWaBotMessage(phone, text);
   if (result && result.success) {
     toast(`📲 Aviso automático enviado por WhatsApp a ${clientName}`);
+  } else if (result && result.error) {
+    toast(`No se pudo enviar el WhatsApp automático: ${result.error}`, true);
   }
 }
 

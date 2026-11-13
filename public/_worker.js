@@ -794,6 +794,56 @@ export default {
         return json({ error: 'Acceso no autorizado al taller. Por favor ingresá con tu PIN.' }, 401);
       }
 
+      // Envío de WhatsApp automático usando el bot central configurado en el servidor
+      if (subRoute === 'bot/send' && request.method === 'POST') {
+        if (!env.BOT_URL || !env.BOT_API_KEY) {
+          return json({ error: 'Bot de WhatsApp no configurado en el servidor.' }, 503);
+        }
+        const body = await request.json().catch(() => ({}));
+        const phone = String(body.phone || '').trim();
+        const message = String(body.message || '').trim();
+        if (!phone || !message) {
+          return json({ error: 'Faltan parámetros requeridos: phone y message.' }, 400);
+        }
+        let upstream;
+        try {
+          upstream = new URL('/api/send', env.BOT_URL);
+        } catch {
+          return json({ error: 'BOT_URL inválida en el servidor.' }, 503);
+        }
+        if (upstream.protocol !== 'https:') return json({ error: 'El bot requiere HTTPS' }, 503);
+        try {
+          const response = await fetch(upstream.toString(), {
+            method: 'POST',
+            redirect: 'manual',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer ' + env.BOT_API_KEY.trim(),
+              Accept: 'application/json',
+              'User-Agent': 'TuTaller-Worker/1.0'
+            },
+            body: JSON.stringify({ phone, message })
+          });
+          if (response.status >= 300 && response.status < 400) {
+            return json({ error: `El bot devolvió una redirección inesperada (HTTP ${response.status})` }, 500);
+          }
+          const rawText = await response.text();
+          let parsed = null;
+          try { parsed = JSON.parse(rawText); } catch {}
+          if (!response.ok) {
+            const msg = parsed?.error || `El bot respondió HTTP ${response.status}`;
+            const status = (response.status === 401 || response.status === 502) ? 500 : response.status;
+            return json({ error: msg }, status);
+          }
+          return new Response(parsed ? JSON.stringify(parsed) : rawText, {
+            status: response.status,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+          });
+        } catch (err) {
+          return json({ error: `No se pudo conectar al bot (${err?.message || 'error de red'})` }, 500);
+        }
+      }
+
       // Fotos de orden: almacenamiento privado por taller y acceso autenticado.
       const photoRoute = subRoute.match(/^orders\/([^/]+)\/photos(?:\/([^/]+))?$/);
       if (photoRoute) {

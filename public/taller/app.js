@@ -950,6 +950,8 @@ function openOrderDetailModal(order) {
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
             <button type="button" class="primary compact" id="btn-send-quote-wa">💬 Enviar presupuesto (wa.me)</button>
             <button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>
+            <button type="button" class="secondary compact" id="btn-quote-png">🖼 Imagen (PNG)</button>
+            <button type="button" class="secondary compact" id="btn-quote-pdf">📄 PDF / Imprimir</button>
           </div>
         </div>
 
@@ -1002,7 +1004,7 @@ function openOrderDetailModal(order) {
     }
   });
 
-  const buildQuoteMessage = () => {
+  const getQuoteData = () => {
     const detail = (d.querySelector('#quote-detail')?.value || '').trim();
     const rawAmount = d.querySelector('#quote-amount')?.value;
     const amountNum = Number(rawAmount);
@@ -1012,15 +1014,36 @@ function openOrderDetailModal(order) {
       toast('Ingresá al menos el trabajo o el importe del presupuesto', true);
       return null;
     }
+    return {
+      detail,
+      amountNum,
+      amountText: amountNum > 0 ? formatMoney(amountNum) : 'A confirmar',
+      eta,
+      warranty,
+      workshopName: currentWorkshop?.name || 'Tu Taller',
+      workshopPhone: currentWorkshop?.phone || '',
+      workshopAddress: currentWorkshop?.address || '',
+      logoUrl: currentSettings?.logo_url || currentWorkshop?.logo_url || '/logo.png',
+      clientName,
+      clientPhone: order.client_phone || '',
+      device: `${order.brand || ''} ${order.model || ''}`.trim() || 'Equipo',
+      orderNumber: order.order_number,
+      fullTrackingUrl: `${location.origin}${trackingUrl}`
+    };
+  };
+
+  const buildQuoteMessage = () => {
+    const q = getQuoteData();
+    if (!q) return null;
     const lines = [
-      `Hola ${clientName}! Te pasamos el presupuesto para tu ${order.brand || ''} ${order.model || 'equipo'} (Orden #${order.order_number}) en ${currentWorkshop?.name || 'el taller'}:`,
+      `Hola ${q.clientName}! Te pasamos el presupuesto para tu ${q.device} (Orden #${q.orderNumber}) en ${q.workshopName}:`,
       ''
     ];
-    if (detail) lines.push(`*Trabajo:* ${detail}`);
-    if (amountNum > 0) lines.push(`*Total:* ${formatMoney(amountNum)}`);
-    if (eta) lines.push(`*Demora estimada:* ${eta}`);
-    if (warranty) lines.push(`*Garantía:* ${warranty}`);
-    lines.push('', `Seguimiento de tu orden:\n${location.origin}${trackingUrl}`, '', '¿Confirmás para avanzar con la reparación?');
+    if (q.detail) lines.push(`*Trabajo:* ${q.detail}`);
+    if (q.amountNum > 0) lines.push(`*Total:* ${q.amountText}`);
+    if (q.eta) lines.push(`*Demora estimada:* ${q.eta}`);
+    if (q.warranty) lines.push(`*Garantía:* ${q.warranty}`);
+    lines.push('', `Seguimiento de tu orden:\n${q.fullTrackingUrl}`, '', '¿Confirmás para avanzar con la reparación?');
     return lines.join('\n');
   };
 
@@ -1041,6 +1064,149 @@ function openOrderDetailModal(order) {
     } else {
       toast('⚠️ Bot no disponible. Usá "Enviar presupuesto (wa.me)".', true);
     }
+  });
+
+  d.querySelector('#btn-quote-png')?.addEventListener('click', async () => {
+    const q = getQuoteData();
+    if (!q) return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 900;
+      canvas.height = 1040;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Franja verde superior
+      ctx.fillStyle = '#059669';
+      ctx.fillRect(0, 0, canvas.width, 160);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 34px sans-serif';
+      ctx.fillText(q.workshopName, 44, 68);
+      ctx.font = '20px sans-serif';
+      ctx.fillStyle = '#d1fae5';
+      ctx.fillText([q.workshopPhone, q.workshopAddress].filter(Boolean).join(' · ') || 'Servicio Técnico Especializado', 44, 105);
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`PRESUPUESTO · ORDEN #${q.orderNumber}`, 44, 140);
+
+      // Cuerpo blanco
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(36, 190, 828, 720);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(36, 190, 828, 720);
+
+      let y = 248;
+      const drawRow = (label, value, boldVal = false) => {
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText(label.toUpperCase(), 68, y);
+        y += 32;
+        ctx.fillStyle = '#0f172a';
+        ctx.font = boldVal ? 'bold 26px sans-serif' : '24px sans-serif';
+        const words = String(value || '-').split(' ');
+        let line = '';
+        for (const w of words) {
+          const test = line ? line + ' ' + w : w;
+          if (ctx.measureText(test).width > 760) {
+            ctx.fillText(line, 68, y);
+            y += 32;
+            line = w;
+          } else {
+            line = test;
+          }
+        }
+        if (line) {
+          ctx.fillText(line, 68, y);
+          y += 42;
+        }
+      };
+
+      drawRow('Cliente', `${q.clientName}${q.clientPhone ? ' · ' + q.clientPhone : ''}`);
+      drawRow('Equipo', q.device);
+      drawRow('Trabajo / Detalle', q.detail || 'Diagnóstico y reparación');
+      if (q.eta) drawRow('Demora estimada', q.eta);
+      if (q.warranty) drawRow('Garantía', q.warranty);
+
+      // Caja Total
+      ctx.fillStyle = '#ecfdf5';
+      ctx.fillRect(68, 730, 764, 96);
+      ctx.strokeStyle = '#10b981';
+      ctx.strokeRect(68, 730, 764, 96);
+      ctx.fillStyle = '#065f46';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('TOTAL PRESUPUESTADO', 92, 768);
+      ctx.font = 'bold 38px sans-serif';
+      ctx.fillText(q.amountText, 92, 810);
+
+      // Pie con link
+      ctx.fillStyle = '#475569';
+      ctx.font = '18px sans-serif';
+      ctx.fillText(`Seguimiento online: ${q.fullTrackingUrl}`, 68, 875);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '16px sans-serif';
+      ctx.fillText(`Generado el ${new Date().toLocaleDateString('es-AR')} · TuTaller Soft`, 44, 965);
+
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('No se pudo generar la imagen');
+      const fileName = `presupuesto-orden-${q.orderNumber}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Presupuesto Orden #${q.orderNumber}` });
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        toast('🖼 Imagen del presupuesto descargada');
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') toast(`Error generando imagen: ${err.message}`, true);
+    }
+  });
+
+  d.querySelector('#btn-quote-pdf')?.addEventListener('click', () => {
+    const q = getQuoteData();
+    if (!q) return;
+    const win = window.open('', '_blank', 'width=820,height=920');
+    if (!win) {
+      toast('Habilitá las ventanas emergentes para generar el PDF', true);
+      return;
+    }
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Presupuesto Orden #${q.orderNumber}</title>
+      <style>
+        body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#f1f5f9;color:#0f172a;padding:24px;}
+        .sheet{max-width:720px;margin:auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;}
+        .hdr{background:#059669;color:#fff;padding:24px 28px;display:flex;align-items:center;gap:16px;}
+        .hdr img{width:56px;height:56px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,0.15);padding:4px;}
+        .hdr h1{margin:0;font-size:22px;} .hdr p{margin:4px 0 0;opacity:.9;font-size:13px;}
+        .body{padding:26px 28px;} .row{margin-bottom:14px;} .lbl{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;}
+        .val{font-size:16px;margin-top:3px;} .total{background:#ecfdf5;border:1.5px solid #10b981;border-radius:10px;padding:16px 20px;margin-top:20px;}
+        .total strong{display:block;font-size:28px;color:#065f46;margin-top:4px;}
+        .ftr{margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;}
+        @media print{body{background:#fff;padding:0;}.sheet{border:none;}}
+      </style></head><body>
+      <div class="sheet">
+        <div class="hdr">
+          <img src="${esc(q.logoUrl)}" alt="Logo">
+          <div><h1>${esc(q.workshopName)}</h1><p>${esc([q.workshopPhone, q.workshopAddress].filter(Boolean).join(' · '))}</p><p><strong>PRESUPUESTO · ORDEN #${q.orderNumber}</strong></p></div>
+        </div>
+        <div class="body">
+          <div class="row"><div class="lbl">Cliente</div><div class="val">${esc(q.clientName)}${q.clientPhone ? ' · ' + esc(q.clientPhone) : ''}</div></div>
+          <div class="row"><div class="lbl">Equipo</div><div class="val">${esc(q.device)}</div></div>
+          <div class="row"><div class="lbl">Trabajo / Detalle</div><div class="val">${esc(q.detail || 'Diagnóstico y reparación')}</div></div>
+          ${q.eta ? `<div class="row"><div class="lbl">Demora estimada</div><div class="val">${esc(q.eta)}</div></div>` : ''}
+          ${q.warranty ? `<div class="row"><div class="lbl">Garantía</div><div class="val">${esc(q.warranty)}</div></div>` : ''}
+          <div class="total"><div class="lbl" style="color:#065f46;">Total presupuestado</div><strong>${esc(q.amountText)}</strong></div>
+          <div class="ftr">Seguimiento online: ${esc(q.fullTrackingUrl)}<br>Fecha: ${new Date().toLocaleDateString('es-AR')}</div>
+        </div>
+      </div>
+      <script>window.onload=()=>{setTimeout(()=>window.print(),250);};</script></body></html>`);
+    win.document.close();
   });
 
   d.querySelector('#btn-modal-send-wa-bot')?.addEventListener('click', async () => {

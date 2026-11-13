@@ -2459,6 +2459,9 @@ function openNewStockModal(editOrOpts = null) {
             ${orderOptions}
           </select>
         </label>
+        <label id="purchase-model-wrap" class="wide">Modelo del equipo (opcional si elegiste orden)
+          <input name="purchase_model" id="purchase-model-input" placeholder="Ej: Motorola e6, Samsung A52">
+        </label>
         <label>Costo estimado ($) (opcional)
           <input name="purchase_cost" type="number" min="0" step="any" placeholder="Ej: 28000">
         </label>
@@ -2643,7 +2646,8 @@ function openNewStockModal(editOrOpts = null) {
     const activeCat = String(fd.get('category') || 'Repuesto');
     const orderId = String(fd.get('order_id') || '').trim();
     const linkedOrder = orderId ? orders.find(o => String(o.id) === orderId) : null;
-    const modelSuffix = linkedOrder ? `${linkedOrder.brand || ''} ${linkedOrder.model || ''}`.trim() : '';
+    const typedModel = String(fd.get('purchase_model') || '').trim();
+    const modelSuffix = typedModel || (linkedOrder ? `${linkedOrder.brand || ''} ${linkedOrder.model || ''}`.trim() : '');
     const priority = String(fd.get('priority') || 'normal');
     const note = String(fd.get('note') || '').trim();
     const cost = Number(fd.get('purchase_cost') || 0);
@@ -2700,8 +2704,10 @@ function openNewStockModal(editOrOpts = null) {
     }
     purchaseBatch.push(...collected.items);
     if (customInp) customInp.value = '';
+    const modelInp = d.querySelector('#purchase-model-input');
     const costInp = d.querySelector('#purchase-only-fields input[name="purchase_cost"]');
     const noteInp = d.querySelector('#purchase-only-fields input[name="note"]');
+    if (modelInp && !presetOrder) modelInp.value = '';
     if (costInp) costInp.value = '';
     if (noteInp) noteInp.value = '';
     if (qtyInp) qtyInp.value = '1';

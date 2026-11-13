@@ -529,7 +529,20 @@ async function triggerAutoWhatsApp(order, type) {
   if (type === 'intake') {
     text = `Hola ${clientName}! 👋 Te confirmamos el ingreso de tu *${order.brand || ''} ${order.model || 'equipo'}* a *${workshopName}*.\n\n📋 *Orden de servicio:* #${order.order_number}\n🔍 *Seguimiento en vivo y presupuesto:*\n${trackingUrl}\n\n¡Muchas gracias por confiar en nuestro servicio!`;
   } else if (type === 'ready') {
-    text = `Hola ${clientName}! 🔔 Te avisamos de *${workshopName}* que tu *${order.brand || ''} ${order.model || 'equipo'}* (Orden #${order.order_number}) ya está *LISTO PARA RETIRAR*.\n\n📍 Podés pasar a retirarlo por nuestro local.\n🔍 Ver comprobante de entrega:\n${trackingUrl}`;
+    const total = Number(order.total_cost || 0);
+    const paid = Number(order.paid_cents || 0) / 100;
+    const saldo = Math.max(0, total - paid);
+    let financeLine = '';
+    if (total > 0 && paid > 0 && saldo > 0) {
+      financeLine = `\n💰 *Total:* ${formatMoney(total)}\n💵 *Seña / abonado:* ${formatMoney(paid)}\n📌 *Saldo restante al retirar:* ${formatMoney(saldo)}`;
+    } else if (total > 0 && paid >= total) {
+      financeLine = `\n💰 *Total:* ${formatMoney(total)} (Ya abonado)`;
+    } else if (total > 0) {
+      financeLine = `\n💰 *Total a abonar al retirar:* ${formatMoney(total)}`;
+    } else if (paid > 0) {
+      financeLine = `\n💵 *Seña / abonado:* ${formatMoney(paid)}`;
+    }
+    text = `Hola ${clientName}! 🔔 Te avisamos de *${workshopName}* que tu *${order.brand || ''} ${order.model || 'equipo'}* (Orden #${order.order_number}) ya está *LISTO PARA RETIRAR*.${financeLine}\n\n📍 Podés pasar a retirarlo por nuestro local.\n🔍 Ver comprobante de entrega:\n${trackingUrl}`;
   } else if (type === 'delivered') {
     text = `Hola ${clientName}! ✅ Tu *${order.brand || ''} ${order.model || 'equipo'}* (Orden #${order.order_number}) fue retirado con éxito de *${workshopName}*.\n\n🛡️ Muchas gracias por confiar en nosotros. ¡Cualquier consulta estamos a disposición!`;
   }
@@ -1509,17 +1522,36 @@ function openOrderDetailModal(order) {
       renderCurrentSection();
 
       if (newStatus === 'ready') {
+        const latestOrder = (workshopData.orders || []).find(o => String(o.id) === String(order.id)) || order;
+        const typedAmount = Number(d.querySelector('#quote-amount')?.value || 0);
+        const total = typedAmount > 0 ? typedAmount : Number(latestOrder.total_cost || 0);
+        const paid = Number(latestOrder.paid_cents || 0) / 100;
+        const saldo = Math.max(0, total - paid);
+
         if (isBotEnabledForWorkshop()) {
-          triggerAutoWhatsApp(order, 'ready');
-        } else if (order.client_phone) {
-          const waPhone = formatWaMePhone(order.client_phone);
-          const total = Number(order.total_cost || 0);
-          const paid = Number(order.paid_cents || 0) / 100;
-          const saldo = Math.max(0, total - paid);
-          const saldoLine = saldo > 0 ? `\nSaldo a abonar al retirar: ${formatMoney(saldo)}` : '';
-          const readyMsg = `Hola ${clientName}! Te avisamos de ${currentWorkshop?.name || 'el taller'} que tu ${order.brand || ''} ${order.model || 'equipo'} (Orden #${order.order_number}) ya está LISTO PARA RETIRAR.${saldoLine}\n\nPodés ver el detalle en tu enlace de seguimiento:\n${location.origin}${trackingUrl}`;
+          triggerAutoWhatsApp({ ...latestOrder, total_cost: total }, 'ready');
+        } else if (latestOrder.client_phone) {
+          const waPhone = formatWaMePhone(latestOrder.client_phone);
+          let financeLine = '';
+          let summaryBadge = '';
+          if (total > 0 && paid > 0 && saldo > 0) {
+            financeLine = `\nTotal de la reparación: ${formatMoney(total)}\nSeña / abonado: ${formatMoney(paid)}\nSaldo restante al retirar: ${formatMoney(saldo)}`;
+            summaryBadge = `<p class="muted" style="font-size:13px;">Total: <strong>${formatMoney(total)}</strong> · Seña/Abonado: <strong style="color:#34d399;">${formatMoney(paid)}</strong> · Saldo a cobrar: <strong style="color:#fbbf24;">${formatMoney(saldo)}</strong></p>`;
+          } else if (total > 0 && paid >= total) {
+            financeLine = `\nTotal de la reparación: ${formatMoney(total)} (Ya abonado en su totalidad)`;
+            summaryBadge = `<p class="muted" style="font-size:13px;">Total: <strong>${formatMoney(total)}</strong> · <strong style="color:#34d399;">✓ Ya abonado</strong></p>`;
+          } else if (total > 0) {
+            financeLine = `\nTotal a abonar al retirar: ${formatMoney(total)}`;
+            summaryBadge = `<p class="muted" style="font-size:13px;">Total a abonar: <strong>${formatMoney(total)}</strong> (sin seña registrada)</p>`;
+          } else if (paid > 0) {
+            financeLine = `\nSeña / abonado: ${formatMoney(paid)}`;
+            summaryBadge = `<p class="muted" style="font-size:13px;">Seña/Abonado: <strong style="color:#34d399;">${formatMoney(paid)}</strong></p>`;
+          }
+
+          const readyMsg = `Hola ${clientName}! Te avisamos de ${currentWorkshop?.name || 'el taller'} que tu ${latestOrder.brand || ''} ${latestOrder.model || 'equipo'} (Orden #${latestOrder.order_number}) ya está LISTO PARA RETIRAR.${financeLine}\n\nPodés ver el detalle en tu enlace de seguimiento:\n${location.origin}${trackingUrl}`;
           const promptDlg = modal('✅ Equipo listo para retirar', `
-            <p style="margin-top:0;">¿Querés avisarle ahora por WhatsApp a <strong>${esc(clientName)}</strong> que su <strong>${esc(order.brand || '')} ${esc(order.model || 'equipo')}</strong> (Orden #${order.order_number}) ya está listo para retirar?</p>
+            <p style="margin-top:0;">¿Querés avisarle ahora por WhatsApp a <strong>${esc(clientName)}</strong> que su <strong>${esc(latestOrder.brand || '')} ${esc(latestOrder.model || 'equipo')}</strong> (Orden #${latestOrder.order_number}) ya está listo para retirar?</p>
+            ${summaryBadge}
             <div class="form-actions" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
               <button type="button" class="secondary" id="btn-ready-skip">Ahora no</button>
               <a class="primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;" id="btn-ready-send-wa" href="https://wa.me/${waPhone}?text=${encodeURIComponent(readyMsg)}" target="_blank" rel="noopener noreferrer">

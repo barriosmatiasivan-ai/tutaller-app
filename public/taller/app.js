@@ -2215,19 +2215,41 @@ const COMMON_REPAIR_PARTS = [
   '24 - Cargador / Cable USB-C / Lightning'
 ];
 
+const COMMON_ACCESSORIES = [
+  '1 - Funda silicona / antigolpe',
+  '2 - Auriculares inalámbricos / TWS',
+  '3 - Auriculares con cable (3.5mm / USB-C)',
+  '4 - Cable USB-C / Lightning / MicroUSB',
+  '5 - Cargador de pared (20W / carga rápida)',
+  '6 - Cargador para auto',
+  '7 - Power bank / Batería portátil',
+  '8 - Soporte para auto / escritorio',
+  '9 - Aro de luz / Trípode',
+  '10 - Parlante Bluetooth',
+  '11 - Memoria MicroSD / Pendrive',
+  '12 - Adaptador OTG / Audio Jack',
+  '13 - Smartwatch / Malla de reloj',
+  '14 - Hidrogel / Film protector',
+  '15 - Protector de cámara',
+  '16 - PopSocket / Anillo sujetador',
+  '17 - Funda impermeable',
+  '18 - Limpiador de pantalla / Kit limpieza'
+];
+
 // Modal nuevo / editar producto en stock (o cargar faltante a lista de compras)
 function openNewStockModal(editOrOpts = null) {
   const isEdit = Boolean(editOrOpts && editOrOpts.id && !editOrOpts.presetOrder);
   const item = isEdit ? editOrOpts : null;
   const presetOrder = editOrOpts && editOrOpts.presetOrder ? editOrOpts.presetOrder : null;
   const forceMode = editOrOpts && editOrOpts.forceMode ? editOrOpts.forceMode : null;
-  const categories = ['Pantallas / Módulos', 'Baterías', 'Pines de carga', 'Fundas / Vidrios', 'Cargadores / Cables', 'Herramientas', 'General'];
+  const categories = ['Repuesto', 'Accesorio', 'Vidrio templado'];
 
   if (isEdit) {
     const priceVal = item.price ?? (Number(item.sale_price_cents || 0) / 100);
     const costVal = item.cost ?? (Number(item.unit_cost_cents || 0) / 100);
-    const currentCat = item.category || 'General';
-    const catOptions = categories.map(c => `<option value="${esc(c)}" ${currentCat === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
+    const currentCat = item.category || 'Repuesto';
+    const editCategories = categories.includes(currentCat) ? categories : [...categories, currentCat];
+    const catOptions = editCategories.map(c => `<option value="${esc(c)}" ${currentCat === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
 
     const d = modal('✏️ Editar producto', `
       <form id="new-stock-form" class="form-grid">
@@ -2309,25 +2331,36 @@ function openNewStockModal(editOrOpts = null) {
         </select>
       </label>
 
-      <label class="wide" id="stock-part-wrap">Repuesto o producto (por prioridad)
-        <select name="part_type" id="stock-part-select">
-          ${COMMON_REPAIR_PARTS.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}
-          <option value="__OTHER__">Otro repuesto / producto (escribir manualmente)</option>
-        </select>
-      </label>
-
-      <label class="wide" id="stock-custom-wrap" style="display:none;">Especificar repuesto o producto
-        <input name="custom_name" id="stock-custom-input" placeholder="Ej: Sensor de proximidad / Cable flex NFC">
-      </label>
-
-      <label>Cantidad
-        <input name="quantity" type="number" min="${defaultDest === 'purchase' ? 1 : 0}" step="1" required value="1" id="stock-qty-input">
-      </label>
-
-      <label id="stock-cat-wrap" style="display:${!presetOrder && defaultDest === 'stock' ? 'block' : 'none'};">Categoría
+      <label class="wide" id="stock-cat-wrap" style="display:${!presetOrder ? 'block' : 'none'};">Categoría
         <select name="category" id="stock-cat-select">
           ${categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
         </select>
+      </label>
+
+      <label class="wide" id="stock-part-wrap">Repuesto o producto (por prioridad)
+        <select name="part_type" id="stock-part-select">
+          ${COMMON_REPAIR_PARTS.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}
+          <option value="__OTHER__">Otro (escribir manualmente)</option>
+        </select>
+      </label>
+
+      <label class="wide" id="stock-custom-wrap" style="display:none;">Especificar producto
+        <input name="custom_name" id="stock-custom-input" placeholder="Ej: Sensor de proximidad / Cable flex NFC">
+      </label>
+
+      <div id="tempered-glass-wrap" class="wide" style="display:none;flex-direction:column;gap:10px;padding:12px;border:1px solid rgba(255,255,255,0.12);border-radius:12px;background:rgba(255,255,255,0.02);">
+        <label>Tipo / Calidad (opcional)
+          <input name="glass_type" id="glass-type-input" placeholder="Ej: 9D / Privacidad / Cerámico (vacío = Vidrio templado)">
+        </label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span style="font-size:13px;font-weight:600;">Modelos y cantidades</span>
+          <button type="button" class="secondary compact" id="btn-add-glass-row">＋ Agregar otro modelo</button>
+        </div>
+        <div id="tempered-glass-rows" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <label id="stock-qty-wrap">Cantidad
+        <input name="quantity" type="number" min="${defaultDest === 'purchase' ? 1 : 0}" step="1" required value="1" id="stock-qty-input">
       </label>
 
       <label id="purchase-priority-wrap" style="display:${defaultDest === 'purchase' ? 'block' : 'none'};">Prioridad
@@ -2339,7 +2372,7 @@ function openNewStockModal(editOrOpts = null) {
       </label>
 
       <div id="stock-only-fields" class="wide" style="display:${!presetOrder && defaultDest === 'stock' ? 'grid' : 'none'};grid-template-columns:1fr 1fr;gap:12px;">
-        <label>Modelos compatibles (opcional)
+        <label id="stock-models-wrap">Modelos compatibles (opcional)
           <input name="compatible_models" id="stock-models-input" placeholder="Ej: Samsung A52, Moto G84">
         </label>
         <label>Precio de venta ($)
@@ -2391,32 +2424,84 @@ function openNewStockModal(editOrOpts = null) {
   const destSel = d.querySelector('#stock-dest-select');
   const existingWrap = d.querySelector('#order-existing-stock-wrap');
   const existingSel = d.querySelector('#order-existing-stock-select');
+  const catWrap = d.querySelector('#stock-cat-wrap');
+  const catSel = d.querySelector('#stock-cat-select');
   const partWrap = d.querySelector('#stock-part-wrap');
   const partSel = d.querySelector('#stock-part-select');
   const customWrap = d.querySelector('#stock-custom-wrap');
   const customInp = d.querySelector('#stock-custom-input');
-  const catWrap = d.querySelector('#stock-cat-wrap');
+  const glassWrap = d.querySelector('#tempered-glass-wrap');
+  const glassRowsEl = d.querySelector('#tempered-glass-rows');
+  const addGlassRowBtn = d.querySelector('#btn-add-glass-row');
+  const qtyWrap = d.querySelector('#stock-qty-wrap');
+  const qtyInp = d.querySelector('#stock-qty-input');
+  const modelsWrap = d.querySelector('#stock-models-wrap');
   const prioWrap = d.querySelector('#purchase-priority-wrap');
   const stockFields = d.querySelector('#stock-only-fields');
   const purchaseFields = d.querySelector('#purchase-only-fields');
-  const qtyInp = d.querySelector('#stock-qty-input');
   const submitBtn = d.querySelector('#btn-submit-stock-form');
+
+  const addGlassRow = (modelVal = '', qtyVal = 1) => {
+    if (!glassRowsEl) return;
+    const row = document.createElement('div');
+    row.className = 'glass-model-row';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 90px auto;gap:8px;align-items:center;';
+    row.innerHTML = `
+      <input type="text" class="glass-row-model" value="${esc(modelVal)}" placeholder="Modelo (ej: Samsung A52 / iPhone 13)">
+      <input type="number" class="glass-row-qty" min="1" step="1" value="${Math.max(1, Number(qtyVal || 1))}" title="Cantidad">
+      <button type="button" class="secondary compact btn-remove-glass-row" title="Quitar fila">✕</button>
+    `;
+    row.querySelector('.btn-remove-glass-row')?.addEventListener('click', () => {
+      if (glassRowsEl.querySelectorAll('.glass-model-row').length > 1) {
+        row.remove();
+      } else {
+        row.querySelector('.glass-row-model').value = '';
+        row.querySelector('.glass-row-qty').value = '1';
+      }
+    });
+    glassRowsEl.appendChild(row);
+  };
+
+  addGlassRow();
+  addGlassRowBtn?.addEventListener('click', () => {
+    addGlassRow();
+    glassRowsEl?.querySelector('.glass-model-row:last-child .glass-row-model')?.focus();
+  });
+
+  const populatePartOptions = (category) => {
+    if (!partSel) return;
+    const list = category === 'Accesorio' ? COMMON_ACCESSORIES : COMMON_REPAIR_PARTS;
+    const otherLabel = category === 'Accesorio'
+      ? 'Otro accesorio (escribir manualmente)'
+      : 'Otro repuesto (escribir manualmente)';
+    partSel.innerHTML = `${list.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}<option value="__OTHER__">${otherLabel}</option>`;
+    const partLabelNode = partWrap?.firstChild;
+    if (partLabelNode && partLabelNode.nodeType === Node.TEXT_NODE) {
+      partLabelNode.textContent = category === 'Accesorio' ? 'Accesorio (por relevancia)\n        ' : 'Repuesto (por prioridad)\n        ';
+    }
+  };
 
   const syncDestUI = () => {
     const isPurchase = destSel?.value === 'purchase';
     const isOrderStockUse = Boolean(presetOrder && !isPurchase);
+    const activeCat = presetOrder ? 'Repuesto' : (catSel?.value || 'Repuesto');
+    const isGlass = !isOrderStockUse && activeCat === 'Vidrio templado';
 
     if (existingWrap) existingWrap.style.display = isOrderStockUse ? 'block' : 'none';
-    if (partWrap) partWrap.style.display = isOrderStockUse ? 'none' : 'block';
-    if (customWrap) customWrap.style.display = (!isOrderStockUse && partSel?.value === '__OTHER__') ? 'block' : 'none';
-    if (customInp) customInp.required = Boolean(!isOrderStockUse && partSel?.value === '__OTHER__');
+    if (catWrap) catWrap.style.display = presetOrder ? 'none' : 'block';
+    if (partWrap) partWrap.style.display = (isOrderStockUse || isGlass) ? 'none' : 'block';
+    if (glassWrap) glassWrap.style.display = isGlass ? 'flex' : 'none';
+    if (customWrap) customWrap.style.display = (!isOrderStockUse && !isGlass && partSel?.value === '__OTHER__') ? 'block' : 'none';
+    if (customInp) customInp.required = Boolean(!isOrderStockUse && !isGlass && partSel?.value === '__OTHER__');
 
-    if (catWrap) catWrap.style.display = (!isPurchase && !presetOrder) ? 'block' : 'none';
+    if (qtyWrap) qtyWrap.style.display = isGlass ? 'none' : 'block';
+    if (modelsWrap) modelsWrap.style.display = isGlass ? 'none' : 'block';
     if (prioWrap) prioWrap.style.display = isPurchase ? 'block' : 'none';
     if (stockFields) stockFields.style.display = (!isPurchase && !presetOrder) ? 'grid' : 'none';
     if (purchaseFields) purchaseFields.style.display = isPurchase ? 'grid' : 'none';
 
     if (qtyInp) {
+      qtyInp.required = !isGlass;
       qtyInp.min = (isPurchase || isOrderStockUse) ? '1' : '0';
       if (isOrderStockUse && existingSel?.value) {
         const opt = existingSel.selectedOptions?.[0];
@@ -2438,9 +2523,14 @@ function openNewStockModal(editOrOpts = null) {
     }
   };
 
+  populatePartOptions(catSel?.value || 'Repuesto');
   syncDestUI();
   destSel?.addEventListener('change', syncDestUI);
   existingSel?.addEventListener('change', syncDestUI);
+  catSel?.addEventListener('change', () => {
+    populatePartOptions(catSel.value);
+    syncDestUI();
+  });
   partSel?.addEventListener('change', () => {
     const isOther = partSel.value === '__OTHER__';
     if (customWrap) customWrap.style.display = isOther ? 'block' : 'none';
@@ -2454,6 +2544,7 @@ function openNewStockModal(editOrOpts = null) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const dest = String(fd.get('dest') || 'stock');
+    const selectedCategory = presetOrder ? 'Repuesto' : String(fd.get('category') || 'Repuesto');
 
     try {
       if (presetOrder && dest === 'stock') {
@@ -2479,12 +2570,82 @@ function openNewStockModal(editOrOpts = null) {
         return;
       }
 
+      if (selectedCategory === 'Vidrio templado') {
+        const glassRows = Array.from(d.querySelectorAll('#tempered-glass-rows .glass-model-row'))
+          .map(row => ({
+            model: String(row.querySelector('.glass-row-model')?.value || '').trim(),
+            qty: Math.max(1, Math.round(Number(row.querySelector('.glass-row-qty')?.value || 1)))
+          }))
+          .filter(r => r.model);
+
+        if (!glassRows.length) {
+          toast('Ingresá al menos un modelo de vidrio templado', true);
+          return;
+        }
+
+        const rawType = String(fd.get('glass_type') || '').trim();
+        const glassPrefix = rawType
+          ? (rawType.toLowerCase().includes('vidrio') ? rawType : `Vidrio templado ${rawType}`)
+          : 'Vidrio templado';
+
+        if (dest === 'purchase') {
+          const orderId = String(fd.get('order_id') || '').trim();
+          for (const r of glassRows) {
+            await api(`/api/workshop/${currentSlug}/purchases`, {
+              method: 'POST',
+              body: JSON.stringify({
+                name: `${glassPrefix} — ${r.model}`,
+                quantity: r.qty,
+                priority: String(fd.get('priority') || 'normal'),
+                order_id: orderId || null,
+                note: String(fd.get('note') || '').trim(),
+                cost: Number(fd.get('purchase_cost') || 0)
+              })
+            });
+          }
+          toast(`✓ ${glassRows.length} modelo(s) agregado(s) a la lista de compras`);
+        } else {
+          const costNum = Number(fd.get('cost') || 0);
+          const priceNum = Number(fd.get('price') || 0);
+          const recordCash = fd.get('record_cash') === '1';
+          const payMethod = String(fd.get('payment_method') || 'efectivo');
+          const skuVal = String(fd.get('sku') || '').trim();
+          let totalUnits = 0;
+          let cashCount = 0;
+
+          for (const r of glassRows) {
+            totalUnits += r.qty;
+            const res = await api(`/api/workshop/${currentSlug}/stock`, {
+              method: 'POST',
+              body: JSON.stringify({
+                name: `${glassPrefix} — ${r.model}`,
+                category: 'Vidrio templado',
+                quantity: r.qty,
+                price: priceNum,
+                cost: costNum,
+                sku: skuVal,
+                compatible_models: r.model,
+                payment_method: payMethod,
+                record_cash: recordCash
+              })
+            });
+            if (res?.cash_entry_id) cashCount++;
+          }
+          toast(cashCount > 0
+            ? `✓ ${glassRows.length} modelo(s) (${totalUnits} u.) agregado(s) al stock · Egreso ${formatMoney(costNum * totalUnits)} registrado en Caja`
+            : `✓ ${glassRows.length} modelo(s) (${totalUnits} u.) agregado(s) al stock`);
+        }
+        d.close();
+        await loadWorkshop();
+        return;
+      }
+
       const rawPart = fd.get('part_type') === '__OTHER__'
         ? String(fd.get('custom_name') || '').trim()
         : String(fd.get('part_type') || '').replace(/^\d+\s*-\s*/, '').trim();
 
       if (!rawPart) {
-        toast('Indicá el nombre del producto o repuesto', true);
+        toast('Indicá el nombre del producto', true);
         return;
       }
 
@@ -2521,7 +2682,7 @@ function openNewStockModal(editOrOpts = null) {
           method: 'POST',
           body: JSON.stringify({
             name: fullName,
-            category: String(fd.get('category') || 'General'),
+            category: selectedCategory,
             quantity: qtyNum,
             price: Number(fd.get('price') || 0),
             cost: costNum,

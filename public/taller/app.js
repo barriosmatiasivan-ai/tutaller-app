@@ -2275,6 +2275,10 @@ function openNewStockModal(editOrOpts = null) {
     `<option value="${o.id}" ${presetOrder && String(presetOrder.id) === String(o.id) ? 'selected' : ''}>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)} (${esc(o.client_name || 'Sin cliente')})</option>`
   ).join('');
   const defaultDest = presetOrder ? 'purchase' : 'stock';
+  const availableStock = (workshopData.stock || []).filter(s => Number(s.quantity || 0) > 0);
+  const existingStockOptions = availableStock.length
+    ? availableStock.map(s => `<option value="${s.id}" data-qty="${Number(s.quantity || 0)}">${esc(s.name)} — Disp: ${Number(s.quantity || 0)}${s.compatible_models ? ` (${esc(s.compatible_models)})` : ''}</option>`).join('')
+    : '<option value="">No hay repuestos disponibles en stock (cantidad > 0)</option>';
 
   const d = modal(presetOrder ? `🛒 Anotar faltante · Orden #${presetOrder.order_number}` : '＋ Nuevo producto / repuesto', `
     <form id="new-stock-form" class="form-grid">
@@ -2285,7 +2289,13 @@ function openNewStockModal(editOrOpts = null) {
         </select>
       </label>
 
-      <label class="wide">Repuesto o producto (por prioridad)
+      <label class="wide" id="order-existing-stock-wrap" style="display:none;">Repuesto en stock disponible
+        <select name="existing_stock_id" id="order-existing-stock-select">
+          ${existingStockOptions}
+        </select>
+      </label>
+
+      <label class="wide" id="stock-part-wrap">Repuesto o producto (por prioridad)
         <select name="part_type" id="stock-part-select">
           ${COMMON_REPAIR_PARTS.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}
           <option value="__OTHER__">Otro repuesto / producto (escribir manualmente)</option>
@@ -2300,7 +2310,7 @@ function openNewStockModal(editOrOpts = null) {
         <input name="quantity" type="number" min="${defaultDest === 'purchase' ? 1 : 0}" step="1" required value="1" id="stock-qty-input">
       </label>
 
-      <label id="stock-cat-wrap" style="display:${defaultDest === 'stock' ? 'block' : 'none'};">Categoría
+      <label id="stock-cat-wrap" style="display:${!presetOrder && defaultDest === 'stock' ? 'block' : 'none'};">Categoría
         <select name="category" id="stock-cat-select">
           ${categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
         </select>
@@ -2314,7 +2324,7 @@ function openNewStockModal(editOrOpts = null) {
         </select>
       </label>
 
-      <div id="stock-only-fields" class="wide" style="display:${defaultDest === 'stock' ? 'grid' : 'none'};grid-template-columns:1fr 1fr;gap:12px;">
+      <div id="stock-only-fields" class="wide" style="display:${!presetOrder && defaultDest === 'stock' ? 'grid' : 'none'};grid-template-columns:1fr 1fr;gap:12px;">
         <label>Modelos compatibles (opcional)
           <input name="compatible_models" id="stock-models-input" placeholder="Ej: Samsung A52, Moto G84">
         </label>
@@ -2353,6 +2363,9 @@ function openNewStockModal(editOrOpts = null) {
   if (!d) return;
 
   const destSel = d.querySelector('#stock-dest-select');
+  const existingWrap = d.querySelector('#order-existing-stock-wrap');
+  const existingSel = d.querySelector('#order-existing-stock-select');
+  const partWrap = d.querySelector('#stock-part-wrap');
   const partSel = d.querySelector('#stock-part-select');
   const customWrap = d.querySelector('#stock-custom-wrap');
   const customInp = d.querySelector('#stock-custom-input');
@@ -2365,15 +2378,43 @@ function openNewStockModal(editOrOpts = null) {
 
   const syncDestUI = () => {
     const isPurchase = destSel?.value === 'purchase';
-    if (catWrap) catWrap.style.display = isPurchase ? 'none' : 'block';
+    const isOrderStockUse = Boolean(presetOrder && !isPurchase);
+
+    if (existingWrap) existingWrap.style.display = isOrderStockUse ? 'block' : 'none';
+    if (partWrap) partWrap.style.display = isOrderStockUse ? 'none' : 'block';
+    if (customWrap) customWrap.style.display = (!isOrderStockUse && partSel?.value === '__OTHER__') ? 'block' : 'none';
+    if (customInp) customInp.required = Boolean(!isOrderStockUse && partSel?.value === '__OTHER__');
+
+    if (catWrap) catWrap.style.display = (!isPurchase && !presetOrder) ? 'block' : 'none';
     if (prioWrap) prioWrap.style.display = isPurchase ? 'block' : 'none';
-    if (stockFields) stockFields.style.display = isPurchase ? 'none' : 'grid';
+    if (stockFields) stockFields.style.display = (!isPurchase && !presetOrder) ? 'grid' : 'none';
     if (purchaseFields) purchaseFields.style.display = isPurchase ? 'grid' : 'none';
-    if (qtyInp) qtyInp.min = isPurchase ? '1' : '0';
-    if (submitBtn) submitBtn.textContent = isPurchase ? '＋ Agregar a lista de compras' : 'Guardar producto';
+
+    if (qtyInp) {
+      qtyInp.min = (isPurchase || isOrderStockUse) ? '1' : '0';
+      if (isOrderStockUse && existingSel?.value) {
+        const opt = existingSel.selectedOptions?.[0];
+        const maxQ = Number(opt?.dataset?.qty || 0);
+        if (maxQ > 0) qtyInp.max = String(maxQ);
+        else qtyInp.removeAttribute('max');
+      } else {
+        qtyInp.removeAttribute('max');
+      }
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = Boolean(isOrderStockUse && !availableStock.length);
+      submitBtn.textContent = isPurchase
+        ? '＋ Agregar a lista de compras'
+        : isOrderStockUse
+          ? '✓ Usar del stock y descontar'
+          : 'Guardar producto';
+    }
   };
 
+  syncDestUI();
   destSel?.addEventListener('change', syncDestUI);
+  existingSel?.addEventListener('change', syncDestUI);
   partSel?.addEventListener('change', () => {
     const isOther = partSel.value === '__OTHER__';
     if (customWrap) customWrap.style.display = isOther ? 'block' : 'none';
@@ -2387,16 +2428,40 @@ function openNewStockModal(editOrOpts = null) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const dest = String(fd.get('dest') || 'stock');
-    const rawPart = fd.get('part_type') === '__OTHER__'
-      ? String(fd.get('custom_name') || '').trim()
-      : String(fd.get('part_type') || '').replace(/^\d+\s*-\s*/, '').trim();
-
-    if (!rawPart) {
-      toast('Indicá el nombre del producto o repuesto', true);
-      return;
-    }
 
     try {
+      if (presetOrder && dest === 'stock') {
+        const stockId = String(fd.get('existing_stock_id') || '').trim();
+        const stockItem = availableStock.find(s => String(s.id) === stockId);
+        if (!stockItem) {
+          toast('Seleccioná un repuesto disponible en stock', true);
+          return;
+        }
+        const usedQty = Math.max(1, Math.round(Number(fd.get('quantity') || 1)));
+        const currentQty = Number(stockItem.quantity || 0);
+        if (usedQty > currentQty) {
+          toast(`Solo hay ${currentQty} unidad(es) disponible(s) en stock`, true);
+          return;
+        }
+        await api(`/api/workshop/${currentSlug}/stock/${stockItem.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ quantity: Math.max(0, currentQty - usedQty) })
+        });
+        toast(`✓ Se descontó ${usedQty} × ${stockItem.name} del stock para la Orden #${presetOrder.order_number}`);
+        d.close();
+        await loadWorkshop();
+        return;
+      }
+
+      const rawPart = fd.get('part_type') === '__OTHER__'
+        ? String(fd.get('custom_name') || '').trim()
+        : String(fd.get('part_type') || '').replace(/^\d+\s*-\s*/, '').trim();
+
+      if (!rawPart) {
+        toast('Indicá el nombre del producto o repuesto', true);
+        return;
+      }
+
       if (dest === 'purchase') {
         const orderId = String(fd.get('order_id') || '').trim();
         const linkedOrder = orderId ? orders.find(o => String(o.id) === orderId) : null;

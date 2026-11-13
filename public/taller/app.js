@@ -811,11 +811,25 @@ function renderOrderStepper(status) {
   `;
 }
 
+function formatWaMePhone(phone) {
+  let clean = String(phone || '').replace(/\D/g, '').replace(/^0+/, '');
+  if (!clean) return '';
+  if (clean.length === 10) clean = '549' + clean;
+  else if (clean.length === 11 && clean.startsWith('9')) clean = '54' + clean;
+  else if (clean.startsWith('54') && !clean.startsWith('549') && clean.length === 12) clean = '549' + clean.slice(2);
+  return clean;
+}
+
 function orderCardHtml(order) {
   const st = STATUS_CONFIG[order.status] || { label: order.status, class: 'repairing' };
   const clientName = order.client_name || 'Cliente sin asignar';
   const clientPhone = order.client_phone ? ` · ${esc(order.client_phone)}` : '';
   const trackingUrl = `/seguimiento/${order.intake_key || order.id}`;
+  const fullTrackingUrl = `${location.origin}${trackingUrl}`;
+  const waPhone = formatWaMePhone(order.client_phone);
+  const waTrackingHref = waPhone
+    ? `https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${clientName}! 👋 Te compartimos el enlace de seguimiento de tu ${order.brand || ''} ${order.model || 'equipo'} (Orden #${order.order_number}) en ${currentWorkshop?.name || 'el taller'} (estado: ${st.label}):\n${fullTrackingUrl}`)}`
+    : trackingUrl;
   const total = Number(order.total_cost || 0);
   const saldo = Number(order.balance_cents || 0) / 100;
   const initials = clientInitials(clientName);
@@ -839,15 +853,15 @@ function orderCardHtml(order) {
         </div>
       </div>
       <div class="order-actions-btns" onclick="event.stopPropagation();">
-        ${order.client_phone ? `
-          <a class="order-action-icon btn-wa-action" href="https://wa.me/${order.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${clientName}, te escribimos de ${currentWorkshop?.name || 'el taller'} sobre tu orden #${order.order_number} (${order.brand} ${order.model}): estado actual: ${st.label}.`)}" target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp al cliente">
+        ${waPhone ? `
+          <a class="order-action-icon btn-wa-action" href="https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${clientName}, te escribimos de ${currentWorkshop?.name || 'el taller'} sobre tu orden #${order.order_number} (${order.brand} ${order.model}): estado actual: ${st.label}.`)}" target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp al cliente">
             <span class="wa-pro-content">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
               <span>WhatsApp</span>
             </span>
           </a>
         ` : ''}
-        <a class="order-action-icon btn-qr-action" href="${trackingUrl}" target="_blank" rel="noopener noreferrer" title="Ver comprobante y QR de seguimiento">
+        <a class="order-action-icon btn-qr-action" href="${waTrackingHref}" target="_blank" rel="noopener noreferrer" title="${waPhone ? 'Enviar enlace de seguimiento por WhatsApp' : 'Ver comprobante y QR de seguimiento'}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         </a>
       </div>

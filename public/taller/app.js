@@ -245,9 +245,35 @@ async function renderOrderPhotoGallery(orderId, gallery) {
   }
 }
 
+function enableDialogBackdropClose(dlg) {
+  if (!dlg || dlg.dataset.backdropCloseBound) return;
+  dlg.dataset.backdropCloseBound = '1';
+  const isOutsideDialog = e => {
+    if (e.target !== dlg) return false;
+    const rect = dlg.getBoundingClientRect();
+    return (
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom
+    );
+  };
+  let startedOutside = false;
+  dlg.addEventListener('pointerdown', e => {
+    startedOutside = isOutsideDialog(e);
+  });
+  dlg.addEventListener('click', e => {
+    if (startedOutside && isOutsideDialog(e)) {
+      dlg.close();
+    }
+    startedOutside = false;
+  });
+}
+
 function modal(title, content) {
   const d = document.querySelector('#app-modal');
   if (!d) return null;
+  enableDialogBackdropClose(d);
   d.innerHTML = `
     <div class="modal-heading">
       <h2>${title}</h2>

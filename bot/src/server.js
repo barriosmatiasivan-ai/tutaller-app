@@ -149,7 +149,7 @@ async function initWhatsApp() {
           ).trim();
 
           // Evitar responder spam repetitivo en menos de 6 minutos salvo comandos directos
-          const isCommand = /^(1|2|3|precio|precios|demo|sistema|orden|#|horario|ubicacion|humano)/i.test(text);
+          const isCommand = /^(1|2|3|precio|precios|demo|sistema|orden|#|horario|ubicacion|humano)|quiero probar|probar tutaller/i.test(text);
           if (chatState.lastReplied && (now - chatState.lastReplied < 6 * 60 * 1000) && !isCommand) {
             continue;
           }
@@ -195,6 +195,15 @@ function generateBotReply(rawText, messageObj) {
   // Si mandó solo un audio o una imagen sin texto
   if (!t && (messageObj?.message?.audioMessage || messageObj?.message?.imageMessage)) {
     return `¡Hola! 👋 Recibimos tu mensaje. En breve Matías o el equipo técnico te responde por este mismo chat en cuanto se desocupe del banco de trabajo. [[HUMANO]]`;
+  }
+
+  // 0. Leads desde anuncio de Instagram ("Quiero probar TuTaller")
+  if (
+    t.includes('probar tutaller') ||
+    (t.includes('quiero probar') && (t.includes('tutaller') || t.includes('sistema') || t.includes('app'))) ||
+    (t.includes('instagram') && (t.includes('probar') || t.includes('demo') || t.includes('tutaller')))
+  ) {
+    return `¡Hola! 👋 ¡Qué bueno que nos escribís para probar *TuTaller Soft*!\n\nPodés entrar ahora mismo a la *Demo interactiva gratuita* (sin tarjeta):\n👉 https://demo.tutallersoft.com\n\nCon *TuTaller Soft* tenés:\n✅ Órdenes de reparación con fotos y seguimiento por QR.\n✅ Avisos automáticos por WhatsApp cuando el equipo está listo.\n✅ Control de caja, deudas de clientes, repuestos y stock.\n\nSi querés que te activemos un *taller de prueba de 48hs con tus propios datos*, pasanos:\n1️⃣ *Nombre de tu taller*\n2️⃣ *Tu correo electrónico*\n\nTambién podés escribir *"precio"* si querés ver los planes disponibles.`;
   }
 
   // 1. Consultas sobre el software TuTaller / Demo / Precios del sistema

@@ -333,11 +333,38 @@ export default {
         if (!env.BOT_ADMIN_KEY || !env.BOT_URL) return json({error:'Configurá el bot de administración.'},503);
         const action = botRoute[1];
         if (request.method !== (action === 'qr' ? 'GET' : 'POST')) return json({error:'Método inválido'},405);
-        const upstream = new URL('/api/' + action, env.BOT_URL);
+        let upstream;
+        try {
+          upstream = new URL('/api/' + action, env.BOT_URL);
+        } catch {
+          return json({error:'BOT_URL inválida en el servidor.'},503);
+        }
         if (upstream.protocol !== 'https:') return json({error:'El bot requiere HTTPS'},503);
         upstream.searchParams.set('format','json');
-        const response = await fetch(upstream, {method:request.method, redirect:'error', headers:{Authorization:'Bearer '+env.BOT_ADMIN_KEY,Accept:'application/json'}});
-        return new Response(response.body,{status:response.status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+        try {
+          const response = await fetch(upstream.toString(), {
+            method: request.method,
+            redirect: 'error',
+            headers: {
+              Authorization: 'Bearer ' + env.BOT_ADMIN_KEY.trim(),
+              Accept: 'application/json'
+            }
+          });
+          const rawText = await response.text();
+          let parsed = null;
+          try { parsed = JSON.parse(rawText); } catch {}
+          if (!response.ok) {
+            const msg = parsed?.error || `El bot respondió HTTP ${response.status}`;
+            const status = response.status === 401 ? 502 : response.status;
+            return json({ error: msg }, status);
+          }
+          return new Response(parsed ? JSON.stringify(parsed) : rawText, {
+            status: response.status,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+          });
+        } catch (err) {
+          return json({ error: `No se pudo conectar al bot (${err?.message || 'error de red'})` }, 502);
+        }
       }
 
       // 1. Métricas generales

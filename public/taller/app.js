@@ -578,7 +578,8 @@ async function loadWorkshop() {
       clients: dataRes.clients || [],
       stock: dataRes.stock || [],
       cash_totals: dataRes.cash_totals,
-      cash_entries: dataRes.cash_entries || []
+      cash_entries: dataRes.cash_entries || [],
+      purchase_needs: dataRes.purchase_needs || []
     };
 
     updateBrandUI();
@@ -664,7 +665,8 @@ function setSection(sectionName) {
           clients: dataRes.clients || [],
           stock: dataRes.stock || [],
           cash_totals: dataRes.cash_totals,
-      cash_entries: dataRes.cash_entries || []
+          cash_entries: dataRes.cash_entries || [],
+          purchase_needs: dataRes.purchase_needs || []
         };
         renderOrders();
       })
@@ -992,6 +994,7 @@ function openOrderDetailModal(order) {
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
           <button type="button" class="primary compact" id="btn-save-quote">💾 Guardar importe</button>
           <button type="button" class="primary compact" id="btn-order-charge" style="background:#059669;">💵 Cobrar</button>
+          <button type="button" class="secondary compact" id="btn-order-need-part">🛒 Faltante</button>
           ${order.client_phone ? `
             <button type="button" class="secondary compact" id="btn-send-quote-wa">💬 Enviar (wa.me)</button>
             <button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>
@@ -1143,6 +1146,10 @@ function openOrderDetailModal(order) {
       try { await saveOrderQuote(true); } catch (e) {}
     }
     openNewCashModal(order);
+  });
+
+  d.querySelector('#btn-order-need-part')?.addEventListener('click', () => {
+    openPurchasingModal(order);
   });
 
   d.querySelector('#btn-send-quote-wa')?.addEventListener('click', () => {
@@ -2015,6 +2022,178 @@ function openNewStockModal(editItem = null) {
   });
 }
 
+// Modal Lista de compras / faltantes
+function openPurchasingModal(presetOrder = null) {
+  const preset = presetOrder && presetOrder.id ? presetOrder : null;
+  const orders = workshopData.orders || [];
+  const orderOptions = orders.map(o =>
+    `<option value="${o.id}" ${preset && String(preset.id) === String(o.id) ? 'selected' : ''}>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)} (${esc(o.client_name || 'Sin cliente')})</option>`
+  ).join('');
+
+  const d = modal(preset ? `🛒 Faltante · Orden #${preset.order_number}` : '🛒 Lista de compras', `
+    <p class="muted" style="margin-top:0;">Anotá repuestos o insumos que necesitás comprar. Tildá los que ya compraste para quitarlos de la lista sin alterar caja ni stock.</p>
+
+    <form id="new-purchase-form" class="form-grid" style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+      <label class="wide">Repuesto o producto a comprar
+        <input name="name" id="purchase-name-input" required placeholder="Ej: Módulo Motorola G84 / Pin de carga Tipo-C" value="${preset ? esc(`Repuesto para ${preset.brand || ''} ${preset.model || ''}`.trim()) : ''}">
+      </label>
+      <label>Cantidad
+        <input name="quantity" type="number" min="1" step="1" required value="1">
+      </label>
+      <label>Prioridad
+        <select name="priority">
+          <option value="normal">Normal</option>
+          <option value="high">Alta (urgente)</option>
+          <option value="low">Baja</option>
+        </select>
+      </label>
+      <label class="wide">Orden / Equipo vinculado (opcional)
+        <select name="order_id">
+          <option value="">Reposición general / stock</option>
+          ${orderOptions}
+        </select>
+      </label>
+      <label class="wide">Nota / Proveedor (opcional)
+        <input name="note" placeholder="Ej: Pedir original o calidad OLED">
+      </label>
+      <div class="form-actions wide">
+        <button type="submit" class="primary">＋ Agregar a la lista</button>
+      </div>
+    </form>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <input type="search" id="purchasing-search" placeholder="Buscar en la lista..." style="flex:1;min-width:180px;">
+      <button type="button" class="primary compact" id="purchasing-resolve-checked" disabled>✓ Quitar comprados</button>
+      <button type="button" class="secondary compact" id="purchasing-export">⬇ Exportar CSV</button>
+    </div>
+    <div id="purchasing-results"></div>
+  `);
+
+  if (!d) return;
+
+  const searchInp = d.querySelector('#purchasing-search');
+  const resultsEl = d.querySelector('#purchasing-results');
+  const resolveBtn = d.querySelector('#purchasing-resolve-checked');
+  const exportBtn = d.querySelector('#purchasing-export');
+  const checkedIds = new Set();
+
+  const priorityLabel = { high: '🔴 Alta', normal: '🟡 Normal', low: '⚪ Baja' };
+
+  const renderList = () => {
+    const q = (searchInp?.value || '').trim().toLowerCase();
+    const list = (workshopData.purchase_needs || []).filter(item => {
+      if (!q) return true;
+      return [item.name, item.note, item.order_brand, item.order_model, item.order_number ? `#${item.order_number}` : '']
+        .filter(Boolean).join(' ').toLowerCase().includes(q);
+    });
+
+    if (!list.length) {
+      resultsEl.innerHTML = `<p class="muted" style="text-align:center;padding:18px 8px;">No hay repuestos pendientes en la lista de compras.</p>`;
+      resolveBtn.disabled = true;
+      return;
+    }
+
+    resultsEl.innerHTML = list.map(item => {
+      const isChecked = checkedIds.has(item.id);
+      return `
+        <div class="purchase-row ${isChecked ? 'is-checked' : ''}" data-purchase-id="${item.id}">
+          <label class="purchase-check">
+            <input type="checkbox" value="${item.id}" ${isChecked ? 'checked' : ''}>
+            <span>Comprado</span>
+          </label>
+          <div class="purchase-main">
+            <strong>${esc(item.name)} × ${Number(item.quantity || 1)}</strong>
+            <p class="muted">
+              ${priorityLabel[item.priority] || 'Normal'}
+              ${item.order_number ? ` · 📱 Orden #${item.order_number} (${esc(item.order_brand || '')} ${esc(item.order_model || '')})` : ' · Reposición general'}
+            </p>
+            ${item.note ? `<small class="muted">${esc(item.note)}</small>` : ''}
+          </div>
+          <div class="purchase-meta">
+            <small class="muted">${new Date(item.created_at).toLocaleDateString('es-AR')}</small>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    resultsEl.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+      chk.addEventListener('change', () => {
+        if (chk.checked) checkedIds.add(chk.value);
+        else checkedIds.delete(chk.value);
+        chk.closest('.purchase-row')?.classList.toggle('is-checked', chk.checked);
+        resolveBtn.disabled = checkedIds.size === 0;
+      });
+    });
+    resolveBtn.disabled = checkedIds.size === 0;
+  };
+
+  renderList();
+  searchInp?.addEventListener('input', renderList);
+
+  d.querySelector('#new-purchase-form')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = Object.fromEntries(fd);
+    try {
+      await api(`/api/workshop/${currentSlug}/purchases`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      toast('Agregado a la lista de compras');
+      e.target.reset();
+      await loadWorkshop();
+      renderList();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  resolveBtn?.addEventListener('click', async () => {
+    const ids = Array.from(checkedIds);
+    if (!ids.length) return;
+    resolveBtn.disabled = true;
+    try {
+      await api(`/api/workshop/${currentSlug}/purchases/resolve`, {
+        method: 'POST',
+        body: JSON.stringify({ ids, reason: 'Comprado en lista de compras' })
+      });
+      checkedIds.clear();
+      toast(`✓ ${ids.length} repuesto(s) quitado(s) de la lista`);
+      await loadWorkshop();
+      renderList();
+    } catch (err) {
+      toast(err.message, true);
+      resolveBtn.disabled = false;
+    }
+  });
+
+  exportBtn?.addEventListener('click', () => {
+    const list = workshopData.purchase_needs || [];
+    if (!list.length) {
+      toast('No hay ítems para exportar', true);
+      return;
+    }
+    const rows = [['Repuesto', 'Cantidad', 'Prioridad', 'Orden', 'Nota', 'Fecha']];
+    list.forEach(item => {
+      rows.push([
+        item.name || '',
+        String(item.quantity || 1),
+        item.priority || 'normal',
+        item.order_number ? `#${item.order_number} ${item.order_brand || ''} ${item.order_model || ''}`.trim() : 'General',
+        item.note || '',
+        new Date(item.created_at).toLocaleDateString('es-AR')
+      ]);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `lista-de-compras-${currentSlug}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  });
+}
+
 // Modal de soporte y reporte
 function openSupportModal() {
   const appName = currentWorkshop?.name || 'Tu Taller Soft';
@@ -2079,6 +2258,7 @@ function initEvents() {
   document.querySelector('#btn-report-issue')?.addEventListener('click', openSupportModal);
   document.querySelector('#btn-cash-new')?.addEventListener('click', openNewCashModal);
   document.querySelector('#btn-stock-new')?.addEventListener('click', openNewStockModal);
+  document.querySelector('#btn-purchasing-list')?.addEventListener('click', openPurchasingModal);
 
   // Onboarding Form (País y Pagos)
   const onbForm = document.querySelector('#onboarding-form');

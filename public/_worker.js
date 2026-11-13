@@ -962,7 +962,7 @@ export default {
 
       // 6. Datos completos para el panel
       if (subRoute === 'data' && request.method === 'GET') {
-        const [settings, clientsRes, ordersRes, stockRes, cashTotals, cashRes] = await Promise.all([
+        const [settings, clientsRes, ordersRes, stockRes, cashTotals, cashRes, purchasesRes] = await Promise.all([
           db.prepare('SELECT * FROM workshop_settings WHERE workshop_id = ?').bind(workshop.id).first(),
           db.prepare(`
             SELECT c.*, (SELECT COUNT(*) FROM repair_orders ro WHERE ro.client_id = c.id AND ro.workshop_id=c.workshop_id) as order_count
@@ -985,6 +985,13 @@ export default {
             FROM cash_entries ce
             LEFT JOIN repair_orders ro ON ce.order_id = ro.id AND ro.workshop_id = ce.workshop_id
             WHERE ce.workshop_id = ? ORDER BY ce.created_at DESC, ce.id DESC LIMIT 50
+          `).bind(workshop.id).all(),
+          db.prepare(`
+            SELECT pn.*, ro.order_number, ro.brand as order_brand, ro.model as order_model
+            FROM purchase_needs pn
+            LEFT JOIN repair_orders ro ON pn.order_id = ro.id AND ro.workshop_id = pn.workshop_id
+            WHERE pn.workshop_id = ? AND pn.status = 'pending'
+            ORDER BY CASE pn.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, pn.created_at DESC
           `).bind(workshop.id).all()
         ]);
 
@@ -995,7 +1002,8 @@ export default {
           orders: ordersRes?.results || [],
           stock: stockRes?.results || [],
           cash_totals: cashTotals,
-          cash_entries: cashRes?.results || []
+          cash_entries: cashRes?.results || [],
+          purchase_needs: purchasesRes?.results || []
         });
       }
 
@@ -1300,6 +1308,49 @@ export default {
         `).bind(name, category, sku, quantity, unitCostCents, salePriceCents, stockId, workshop.id).run();
 
         return json({ success: true, id: stockId, quantity });
+      }
+
+      // 9. Lista de compras / faltantes
+      if (subRoute === 'purchases' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const name = typeof body.name === 'string' ? body.name.trim().slice(0, 200) : '';
+        if (!name) return json({ error: 'Ingresá el nombre del repuesto o producto.' }, 400);
+
+        const quantity = Math.max(1, Math.round(Number(body.quantity || 1)));
+        const priority = ['high', 'normal', 'low'].includes(body.priority) ? body.priority : 'normal';
+        const note = typeof body.note === 'string' ? body.note.trim().slice(0, 1000) : '';
+        const orderId = typeof body.order_id === 'string' && body.order_id.trim() ? body.order_id.trim() : null;
+        if (orderId) {
+          const ord = await db.prepare('SELECT id FROM repair_orders WHERE id = ? AND workshop_id = ?').bind(orderId, workshop.id).first();
+          if (!ord) return json({ error: 'Orden no encontrada.' }, 404);
+        }
+
+        const id = crypto.randomUUID();
+        const nowIso = new Date().toISOString();
+        await db.prepare(`
+          INSERT INTO purchase_needs (id, workshop_id, order_id, name, quantity, priority, note, status, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+        `).bind(id, workshop.id, orderId, name, quantity, priority, note, nowIso).run();
+
+        return json({ success: true, id }, 201);
+      }
+
+      if (subRoute === 'purchases/resolve' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const ids = Array.isArray(body.ids) ? body.ids.filter(v => typeof v === 'string' && v.trim()) : [];
+        if (!ids.length) return json({ error: 'Seleccioná al menos un faltante.' }, 400);
+        const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : 'Comprado en lista de compras';
+        const nowIso = new Date().toISOString();
+
+        const stmts = ids.map(id =>
+          db.prepare(`
+            UPDATE purchase_needs
+            SET status = 'resolved', resolved_reason = ?, resolved_at = ?
+            WHERE id = ? AND workshop_id = ?
+          `).bind(reason, nowIso, id.trim(), workshop.id)
+        );
+        await db.batch(stmts);
+        return json({ success: true, resolved: ids.length });
       }
     }
 

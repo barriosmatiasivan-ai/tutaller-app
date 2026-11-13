@@ -828,7 +828,7 @@ function orderCardHtml(order) {
   const fullTrackingUrl = `${location.origin}${trackingUrl}`;
   const waPhone = formatWaMePhone(order.client_phone);
   const waTrackingHref = waPhone
-    ? `https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${clientName}! 👋 Te compartimos el enlace de seguimiento de tu ${order.brand || ''} ${order.model || 'equipo'} (Orden #${order.order_number}) en ${currentWorkshop?.name || 'el taller'} (estado: ${st.label}):\n${fullTrackingUrl}`)}`
+    ? `https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${clientName}! Te compartimos el enlace de seguimiento de tu ${order.brand || ''} ${order.model || 'equipo'} (Orden #${order.order_number}) en ${currentWorkshop?.name || 'el taller'} (estado: ${st.label}):\n${fullTrackingUrl}`)}`
     : trackingUrl;
   const total = Number(order.total_cost || 0);
   const saldo = Number(order.balance_cents || 0) / 100;

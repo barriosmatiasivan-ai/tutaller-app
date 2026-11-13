@@ -3422,8 +3422,8 @@ function setupUISwitcher() {
     }
   }
 
-  // Cargar preferencia guardada (por defecto 'pro' o 'classic' según elección)
-  const savedMode = localStorage.getItem('tutaller_ui_mode') || 'classic';
+  // Cargar preferencia guardada (por defecto 'pro')
+  const savedMode = localStorage.getItem('tutaller_ui_mode') || 'pro';
   applyUIMode(savedMode);
 
   btn?.addEventListener('click', () => {

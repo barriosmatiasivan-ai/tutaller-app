@@ -1555,6 +1555,7 @@ function renderStock() {
   const container = document.querySelector('#stock-container');
   if (!container) return;
   let items = workshopData.stock || [];
+  let needs = workshopData.purchase_needs || [];
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     items = items.filter(s =>
@@ -1563,23 +1564,56 @@ function renderStock() {
       (s.sku && s.sku.toLowerCase().includes(q)) ||
       (s.compatible_models && s.compatible_models.toLowerCase().includes(q))
     );
+    needs = needs.filter(n =>
+      [n.name, n.note, n.order_brand, n.order_model, n.order_number ? `#${n.order_number}` : '']
+        .filter(Boolean).join(' ').toLowerCase().includes(q)
+    );
   }
 
-  if (items.length === 0) {
-    container.innerHTML = `
-      <div class="empty">
-        <span class="icon-classic">📦</span>
-        <div class="icon-pro empty-pro-badge" style="margin:0 auto 12px;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
-        </div>
-        <h3>Inventario vacío</h3>
-        <p>Cargá pantallas, baterías, pines de carga y accesorios para controlar tu stock.</p>
+  const needsHtml = needs.length ? `
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <h3 style="margin:0;font-size:15px;">🛒 Repuestos pendientes / En camino (${needs.length})</h3>
+        <button type="button" class="secondary compact" id="btn-stock-open-purchasing">Abrir lista completa</button>
       </div>
-    `;
-    return;
-  }
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${needs.map(n => {
+          const isOrdered = n.status === 'ordered';
+          const badge = isOrdered
+            ? `<span class="badge" style="background:rgba(59,130,246,0.16);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">🚚 Pedido realizado</span>`
+            : `<span class="badge" style="background:rgba(245,158,11,0.16);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);">⏳ Pendiente de compra</span>`;
+          const modelStr = n.order_number ? ` · 📱 Orden #${n.order_number} (${esc(n.order_brand || '')} ${esc(n.order_model || '')})` : '';
+          return `
+            <div class="stock-card" style="align-items:center;gap:12px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:200px;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <strong>${esc(n.name)} × ${Number(n.quantity || 1)}</strong>
+                  ${badge}
+                </div>
+                <p class="muted" style="margin:4px 0 0;">${n.priority === 'high' ? '🔴 Prioridad Alta' : n.priority === 'low' ? '⚪ Prioridad Baja' : '🟡 Prioridad Normal'}${modelStr}${n.note ? ` · ${esc(n.note)}` : ''}</p>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                ${!isOrdered
+                  ? `<button type="button" class="secondary compact btn-stock-need-status" data-id="${n.id}" data-status="ordered">📦 Pedido realizado</button>`
+                  : `<button type="button" class="primary compact btn-stock-need-status" data-id="${n.id}" data-status="resolved">✅ Ingresó al taller</button>`}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
 
-  container.innerHTML = items.map(s => `
+  const inventoryHtml = items.length === 0 ? `
+    <div class="empty">
+      <span class="icon-classic">📦</span>
+      <div class="icon-pro empty-pro-badge" style="margin:0 auto 12px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+      </div>
+      <h3>${needs.length ? 'Sin productos propios cargados en stock' : 'Inventario vacío'}</h3>
+      <p>Cargá pantallas, baterías, pines de carga y accesorios para controlar tu stock.</p>
+    </div>
+  ` : items.map(s => `
     <div class="stock-card" data-stock-id="${s.id}" style="cursor:pointer;">
       <div>
         <strong>${esc(s.name)}</strong>
@@ -1591,6 +1625,27 @@ function renderStock() {
       </div>
     </div>
   `).join('');
+
+  container.innerHTML = needsHtml + inventoryHtml;
+
+  container.querySelector('#btn-stock-open-purchasing')?.addEventListener('click', () => openPurchasingModal());
+  container.querySelectorAll('.btn-stock-need-status').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      btn.disabled = true;
+      try {
+        await api(`/api/workshop/${currentSlug}/purchases/${btn.dataset.id}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ status: btn.dataset.status })
+        });
+        toast(btn.dataset.status === 'ordered' ? '📦 Marcado como pedido realizado' : '✅ Ingreso al taller confirmado');
+        await loadWorkshop();
+      } catch (err) {
+        toast(err.message, true);
+        btn.disabled = false;
+      }
+    });
+  });
 
   container.querySelectorAll('.stock-card[data-stock-id]').forEach(el => {
     el.addEventListener('click', () => {
@@ -2030,40 +2085,73 @@ function openPurchasingModal(presetOrder = null) {
     `<option value="${o.id}" ${preset && String(preset.id) === String(o.id) ? 'selected' : ''}>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)} (${esc(o.client_name || 'Sin cliente')})</option>`
   ).join('');
 
+  const COMMON_PARTS = [
+    '1 - Pantalla / Módulo completo',
+    '2 - Batería',
+    '3 - Pin de carga / Subplaca de carga',
+    '4 - Tapa trasera / Carcasa',
+    '5 - Glass / Vidrio frontal (remanufactura)',
+    '6 - Flex de encendido / Volumen',
+    '7 - Flex main / Interconexión',
+    '8 - Cámara trasera (módulo)',
+    '9 - Cámara frontal',
+    '10 - Lente / Vidrio de cámara',
+    '11 - Parlante / Buzzer (altavoz)',
+    '12 - Auricular superior',
+    '13 - Micrófono',
+    '14 - Sensor de huella / Biometría',
+    '15 - Lector de SIM / Bandeja SIM',
+    '16 - Antena / Cable coaxial de señal',
+    '17 - Vibrador',
+    '18 - Chasis / Marco intermedio',
+    '19 - Bisagra / Flex de bisagra',
+    '20 - IC de carga / Circuito integrado / PMIC',
+    '21 - Conector FPC / Zócalo en placa',
+    '22 - Adhesivo / Pegamento / Cinta doble faz',
+    '23 - Funda / Vidrio templado / Hidrogel',
+    '24 - Cargador / Cable USB-C / Lightning'
+  ];
+
   const d = modal(preset ? `🛒 Faltante · Orden #${preset.order_number}` : '🛒 Lista de compras', `
-    <p class="muted" style="margin-top:0;">Anotá repuestos o insumos que necesitás comprar. Tildá los que ya compraste para quitarlos de la lista sin alterar caja ni stock.</p>
+    <p class="muted" style="margin-top:0;">Elegí el repuesto necesario, vinculalo al equipo si corresponde y organizá los <strong>Pendientes</strong> y los <strong>Pedidos realizados</strong> por internet hasta su ingreso al taller.</p>
 
     <form id="new-purchase-form" class="form-grid" style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);">
-      <label class="wide">Repuesto o producto a comprar
-        <input name="name" id="purchase-name-input" required placeholder="Ej: Módulo Motorola G84 / Pin de carga Tipo-C" value="${preset ? esc(`Repuesto para ${preset.brand || ''} ${preset.model || ''}`.trim()) : ''}">
+      <label class="wide">Repuesto o producto a comprar (por prioridad)
+        <select name="part_type" id="purchase-part-select">
+          ${COMMON_PARTS.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}
+          <option value="__OTHER__">Otro repuesto / producto (escribir manualmente)</option>
+        </select>
+      </label>
+      <label class="wide" id="purchase-custom-wrap" style="display:none;">Especificar repuesto o producto
+        <input name="custom_name" id="purchase-custom-input" placeholder="Ej: Sensor de proximidad / Cable flex NFC">
       </label>
       <label>Cantidad
         <input name="quantity" type="number" min="1" step="1" required value="1">
       </label>
       <label>Prioridad
         <select name="priority">
-          <option value="normal">Normal</option>
           <option value="high">Alta (urgente)</option>
+          <option value="normal" selected>Normal</option>
           <option value="low">Baja</option>
         </select>
       </label>
       <label class="wide">Orden / Equipo vinculado (opcional)
-        <select name="order_id">
+        <select name="order_id" id="purchase-order-select">
           <option value="">Reposición general / stock</option>
           ${orderOptions}
         </select>
       </label>
-      <label class="wide">Nota / Proveedor (opcional)
-        <input name="note" placeholder="Ej: Pedir original o calidad OLED">
+      <label class="wide">Nota / Proveedor / Calidad (opcional)
+        <input name="note" placeholder="Ej: Calidad OLED / Mercado Libre / Proveedor local">
       </label>
       <div class="form-actions wide">
         <button type="submit" class="primary">＋ Agregar a la lista</button>
       </div>
     </form>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
-      <input type="search" id="purchasing-search" placeholder="Buscar en la lista..." style="flex:1;min-width:180px;">
-      <button type="button" class="primary compact" id="purchasing-resolve-checked" disabled>✓ Quitar comprados</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <input type="search" id="purchasing-search" placeholder="Buscar por repuesto, modelo o proveedor..." style="flex:1;min-width:180px;">
+      <button type="button" class="primary compact" id="purchasing-resolve-checked" disabled>✓ Marcar ingreso / comprados</button>
       <button type="button" class="secondary compact" id="purchasing-export">⬇ Exportar CSV</button>
     </div>
     <div id="purchasing-results"></div>
@@ -2071,13 +2159,70 @@ function openPurchasingModal(presetOrder = null) {
 
   if (!d) return;
 
+  const partSel = d.querySelector('#purchase-part-select');
+  const customWrap = d.querySelector('#purchase-custom-wrap');
+  const customInp = d.querySelector('#purchase-custom-input');
   const searchInp = d.querySelector('#purchasing-search');
   const resultsEl = d.querySelector('#purchasing-results');
   const resolveBtn = d.querySelector('#purchasing-resolve-checked');
   const exportBtn = d.querySelector('#purchasing-export');
   const checkedIds = new Set();
 
+  partSel?.addEventListener('change', () => {
+    const isOther = partSel.value === '__OTHER__';
+    if (customWrap) customWrap.style.display = isOther ? 'block' : 'none';
+    if (customInp) {
+      customInp.required = isOther;
+      if (isOther) customInp.focus();
+    }
+  });
+
   const priorityLabel = { high: '🔴 Alta', normal: '🟡 Normal', low: '⚪ Baja' };
+
+  const updateItemStatus = async (id, nextStatus) => {
+    await api(`/api/workshop/${currentSlug}/purchases/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: nextStatus })
+    });
+    checkedIds.delete(id);
+    if (nextStatus === 'ordered') toast('📦 Movido a Pedidos realizados');
+    else if (nextStatus === 'resolved') toast('✅ Ingreso al taller confirmado');
+    else toast('↩ Devuelto a Pendientes');
+    await loadWorkshop();
+    renderList();
+  };
+
+  const renderRow = (item, isOrdered) => {
+    const isChecked = checkedIds.has(item.id);
+    const modelLabel = item.order_number
+      ? `${esc(item.order_brand || '')} ${esc(item.order_model || '')}`.trim()
+      : '';
+    return `
+      <div class="purchase-row ${isChecked ? 'is-checked' : ''}" data-purchase-id="${item.id}" style="${isOrdered ? 'border-left:3px solid #60a5fa;' : ''}">
+        <label class="purchase-check">
+          <input type="checkbox" value="${item.id}" ${isChecked ? 'checked' : ''}>
+          <span>${isOrdered ? 'Ingresó' : 'Comprado'}</span>
+        </label>
+        <div class="purchase-main">
+          <strong>${esc(item.name)} × ${Number(item.quantity || 1)}</strong>
+          <p class="muted">
+            ${priorityLabel[item.priority] || 'Normal'}
+            ${item.order_number ? ` · 📱 Orden #${item.order_number}${modelLabel ? ` (${modelLabel})` : ''}` : ' · Reposición general'}
+          </p>
+          ${item.note ? `<small class="muted">${esc(item.note)}</small>` : ''}
+        </div>
+        <div class="purchase-meta" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <small class="muted">${new Date(item.created_at).toLocaleDateString('es-AR')}</small>
+          ${!isOrdered
+            ? `<button type="button" class="secondary compact btn-purchase-status" data-id="${item.id}" data-status="ordered">📦 Pedido realizado</button>`
+            : `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                 <button type="button" class="primary compact btn-purchase-status" data-id="${item.id}" data-status="resolved">✅ Ingresó al taller</button>
+                 <button type="button" class="secondary compact btn-purchase-status" data-id="${item.id}" data-status="pending" title="Volver a pendientes">↩</button>
+               </div>`}
+        </div>
+      </div>
+    `;
+  };
 
   const renderList = () => {
     const q = (searchInp?.value || '').trim().toLowerCase();
@@ -2087,34 +2232,29 @@ function openPurchasingModal(presetOrder = null) {
         .filter(Boolean).join(' ').toLowerCase().includes(q);
     });
 
+    const pendingItems = list.filter(i => i.status !== 'ordered');
+    const orderedItems = list.filter(i => i.status === 'ordered');
+
     if (!list.length) {
-      resultsEl.innerHTML = `<p class="muted" style="text-align:center;padding:18px 8px;">No hay repuestos pendientes en la lista de compras.</p>`;
+      resultsEl.innerHTML = `<p class="muted" style="text-align:center;padding:18px 8px;">No hay repuestos pendientes ni pedidos en camino.</p>`;
       resolveBtn.disabled = true;
       return;
     }
 
-    resultsEl.innerHTML = list.map(item => {
-      const isChecked = checkedIds.has(item.id);
-      return `
-        <div class="purchase-row ${isChecked ? 'is-checked' : ''}" data-purchase-id="${item.id}">
-          <label class="purchase-check">
-            <input type="checkbox" value="${item.id}" ${isChecked ? 'checked' : ''}>
-            <span>Comprado</span>
-          </label>
-          <div class="purchase-main">
-            <strong>${esc(item.name)} × ${Number(item.quantity || 1)}</strong>
-            <p class="muted">
-              ${priorityLabel[item.priority] || 'Normal'}
-              ${item.order_number ? ` · 📱 Orden #${item.order_number} (${esc(item.order_brand || '')} ${esc(item.order_model || '')})` : ' · Reposición general'}
-            </p>
-            ${item.note ? `<small class="muted">${esc(item.note)}</small>` : ''}
-          </div>
-          <div class="purchase-meta">
-            <small class="muted">${new Date(item.created_at).toLocaleDateString('es-AR')}</small>
-          </div>
-        </div>
-      `;
-    }).join('');
+    resultsEl.innerHTML = `
+      <div style="margin-bottom:16px;">
+        <h3 style="margin:0 0 8px;font-size:14px;color:#fbbf24;">⏳ Pendientes de compra (${pendingItems.length})</h3>
+        ${pendingItems.length
+          ? pendingItems.map(i => renderRow(i, false)).join('')
+          : `<p class="muted" style="font-size:13px;padding:8px 0;">Sin repuestos pendientes de compra.</p>`}
+      </div>
+      <div>
+        <h3 style="margin:0 0 8px;font-size:14px;color:#60a5fa;">🚚 Pedidos realizados · En camino (${orderedItems.length})</h3>
+        ${orderedItems.length
+          ? orderedItems.map(i => renderRow(i, true)).join('')
+          : `<p class="muted" style="font-size:13px;padding:8px 0;">Todavía no marcaste pedidos realizados por internet/proveedor.</p>`}
+      </div>
+    `;
 
     resultsEl.querySelectorAll('input[type="checkbox"]').forEach(chk => {
       chk.addEventListener('change', () => {
@@ -2124,6 +2264,19 @@ function openPurchasingModal(presetOrder = null) {
         resolveBtn.disabled = checkedIds.size === 0;
       });
     });
+
+    resultsEl.querySelectorAll('.btn-purchase-status').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await updateItemStatus(btn.dataset.id, btn.dataset.status);
+        } catch (err) {
+          toast(err.message, true);
+          btn.disabled = false;
+        }
+      });
+    });
+
     resolveBtn.disabled = checkedIds.size === 0;
   };
 
@@ -2133,14 +2286,36 @@ function openPurchasingModal(presetOrder = null) {
   d.querySelector('#new-purchase-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const payload = Object.fromEntries(fd);
+    const rawPart = fd.get('part_type') === '__OTHER__'
+      ? String(fd.get('custom_name') || '').trim()
+      : String(fd.get('part_type') || '').replace(/^\d+\s*-\s*/, '').trim();
+    if (!rawPart) {
+      toast('Indicá el repuesto o producto a comprar', true);
+      return;
+    }
+
+    const orderId = String(fd.get('order_id') || '').trim();
+    const linkedOrder = orderId ? orders.find(o => String(o.id) === orderId) : null;
+    const modelSuffix = linkedOrder ? `${linkedOrder.brand || ''} ${linkedOrder.model || ''}`.trim() : '';
+    const fullName = modelSuffix && !rawPart.toLowerCase().includes(modelSuffix.toLowerCase())
+      ? `${rawPart} — ${modelSuffix}`
+      : rawPart;
+
     try {
       await api(`/api/workshop/${currentSlug}/purchases`, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          name: fullName,
+          quantity: Number(fd.get('quantity') || 1),
+          priority: String(fd.get('priority') || 'normal'),
+          order_id: orderId || null,
+          note: String(fd.get('note') || '').trim()
+        })
       });
       toast('Agregado a la lista de compras');
-      e.target.reset();
+      if (customInp) customInp.value = '';
+      const noteInp = e.target.querySelector('input[name="note"]');
+      if (noteInp) noteInp.value = '';
       await loadWorkshop();
       renderList();
     } catch (err) {
@@ -2155,10 +2330,10 @@ function openPurchasingModal(presetOrder = null) {
     try {
       await api(`/api/workshop/${currentSlug}/purchases/resolve`, {
         method: 'POST',
-        body: JSON.stringify({ ids, reason: 'Comprado en lista de compras' })
+        body: JSON.stringify({ ids, reason: 'Ingreso al taller confirmado' })
       });
       checkedIds.clear();
-      toast(`✓ ${ids.length} repuesto(s) quitado(s) de la lista`);
+      toast(`✓ ${ids.length} repuesto(s) marcado(s) como ingresado(s)`);
       await loadWorkshop();
       renderList();
     } catch (err) {
@@ -2173,9 +2348,10 @@ function openPurchasingModal(presetOrder = null) {
       toast('No hay ítems para exportar', true);
       return;
     }
-    const rows = [['Repuesto', 'Cantidad', 'Prioridad', 'Orden', 'Nota', 'Fecha']];
+    const rows = [['Estado', 'Repuesto y Modelo', 'Cantidad', 'Prioridad', 'Orden', 'Nota', 'Fecha']];
     list.forEach(item => {
       rows.push([
+        item.status === 'ordered' ? 'Pedido realizado' : 'Pendiente',
         item.name || '',
         String(item.quantity || 1),
         item.priority || 'normal',

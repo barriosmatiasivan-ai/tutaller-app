@@ -990,8 +990,8 @@ export default {
             SELECT pn.*, ro.order_number, ro.brand as order_brand, ro.model as order_model
             FROM purchase_needs pn
             LEFT JOIN repair_orders ro ON pn.order_id = ro.id AND ro.workshop_id = pn.workshop_id
-            WHERE pn.workshop_id = ? AND pn.status = 'pending'
-            ORDER BY CASE pn.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, pn.created_at DESC
+            WHERE pn.workshop_id = ? AND pn.status IN ('pending', 'ordered')
+            ORDER BY CASE pn.status WHEN 'pending' THEN 0 ELSE 1 END, CASE pn.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, pn.created_at DESC
           `).bind(workshop.id).all()
         ]);
 
@@ -1351,6 +1351,27 @@ export default {
         );
         await db.batch(stmts);
         return json({ success: true, resolved: ids.length });
+      }
+
+      if (subRoute.startsWith('purchases/') && subRoute.endsWith('/status') && request.method === 'PUT') {
+        const purchaseId = subRoute.split('/')[1];
+        const body = await request.json().catch(() => ({}));
+        const nextStatus = ['pending', 'ordered', 'resolved'].includes(body.status) ? body.status : null;
+        if (!nextStatus) return json({ error: 'Estado inválido.' }, 400);
+
+        const nowIso = new Date().toISOString();
+        const reason = nextStatus === 'resolved'
+          ? (typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : 'Ingreso al taller confirmado')
+          : '';
+        const resolvedAt = nextStatus === 'resolved' ? nowIso : null;
+
+        await db.prepare(`
+          UPDATE purchase_needs
+          SET status = ?, resolved_reason = ?, resolved_at = ?
+          WHERE id = ? AND workshop_id = ?
+        `).bind(nextStatus, reason, resolvedAt, purchaseId, workshop.id).run();
+
+        return json({ success: true, id: purchaseId, status: nextStatus });
       }
     }
 

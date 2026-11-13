@@ -1170,7 +1170,7 @@ function openOrderDetailModal(order) {
   });
 
   d.querySelector('#btn-order-need-part')?.addEventListener('click', () => {
-    openPurchasingModal(order);
+    openNewStockModal({ presetOrder: order });
   });
 
   d.querySelector('#btn-send-quote-wa')?.addEventListener('click', () => {
@@ -2069,63 +2069,253 @@ function openNewCashModal(presetOrder = null) {
   });
 }
 
-// Modal nuevo / editar producto en stock
-function openNewStockModal(editItem = null) {
-  const item = editItem && editItem.id ? editItem : null;
-  const priceVal = item ? (item.price ?? (Number(item.sale_price_cents || 0) / 100)) : '';
-  const costVal = item ? (item.cost ?? (Number(item.unit_cost_cents || 0) / 100)) : '';
-  const categories = ['Pantallas / Módulos', 'Baterías', 'Pines de carga', 'Fundas / Vidrios', 'Cargadores / Cables', 'Herramientas', 'General'];
-  const currentCat = item?.category || 'General';
-  const catOptions = categories.map(c => `<option value="${esc(c)}" ${currentCat === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
+const COMMON_REPAIR_PARTS = [
+  '1 - Pantalla / Módulo completo',
+  '2 - Batería',
+  '3 - Pin de carga / Subplaca de carga',
+  '4 - Tapa trasera / Carcasa',
+  '5 - Glass / Vidrio frontal (remanufactura)',
+  '6 - Flex de encendido / Volumen',
+  '7 - Flex main / Interconexión',
+  '8 - Cámara trasera (módulo)',
+  '9 - Cámara frontal',
+  '10 - Lente / Vidrio de cámara',
+  '11 - Parlante / Buzzer (altavoz)',
+  '12 - Auricular superior',
+  '13 - Micrófono',
+  '14 - Sensor de huella / Biometría',
+  '15 - Lector de SIM / Bandeja SIM',
+  '16 - Antena / Cable coaxial de señal',
+  '17 - Vibrador',
+  '18 - Chasis / Marco intermedio',
+  '19 - Bisagra / Flex de bisagra',
+  '20 - IC de carga / Circuito integrado / PMIC',
+  '21 - Conector FPC / Zócalo en placa',
+  '22 - Adhesivo / Pegamento / Cinta doble faz',
+  '23 - Funda / Vidrio templado / Hidrogel',
+  '24 - Cargador / Cable USB-C / Lightning'
+];
 
-  const d = modal(item ? `✏️ Editar producto` : '＋ Nuevo producto / repuesto', `
+// Modal nuevo / editar producto en stock (o cargar faltante a lista de compras)
+function openNewStockModal(editOrOpts = null) {
+  const isEdit = Boolean(editOrOpts && editOrOpts.id && !editOrOpts.presetOrder);
+  const item = isEdit ? editOrOpts : null;
+  const presetOrder = editOrOpts && editOrOpts.presetOrder ? editOrOpts.presetOrder : null;
+  const categories = ['Pantallas / Módulos', 'Baterías', 'Pines de carga', 'Fundas / Vidrios', 'Cargadores / Cables', 'Herramientas', 'General'];
+
+  if (isEdit) {
+    const priceVal = item.price ?? (Number(item.sale_price_cents || 0) / 100);
+    const costVal = item.cost ?? (Number(item.unit_cost_cents || 0) / 100);
+    const currentCat = item.category || 'General';
+    const catOptions = categories.map(c => `<option value="${esc(c)}" ${currentCat === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
+
+    const d = modal('✏️ Editar producto', `
+      <form id="new-stock-form" class="form-grid">
+        <label class="wide">Nombre del producto o repuesto
+          <input name="name" required value="${esc(item.name || '')}" placeholder="Ej: Módulo Samsung A52 OLED">
+        </label>
+        <label>Categoría
+          <select name="category">${catOptions}</select>
+        </label>
+        <label>Cantidad en stock
+          <input name="quantity" type="number" min="0" step="1" required value="${Number(item.quantity || 0)}">
+        </label>
+        <label>Precio de venta ($)
+          <input name="price" type="number" min="0" step="any" value="${priceVal > 0 ? priceVal : ''}" placeholder="Ej: 45000">
+        </label>
+        <label>Costo ($) (opcional)
+          <input name="cost" type="number" min="0" step="any" value="${costVal > 0 ? costVal : ''}" placeholder="Ej: 28000">
+        </label>
+        <label>SKU / Código (opcional)
+          <input name="sku" value="${esc(item.sku || '')}" placeholder="Ej: MOD-A52">
+        </label>
+        <label>Modelos compatibles (opcional)
+          <input name="compatible_models" value="${esc(item.compatible_models || '')}" placeholder="Ej: A52, A52s">
+        </label>
+        <div class="form-actions wide">
+          <button type="submit" class="primary">Guardar cambios</button>
+        </div>
+      </form>
+    `);
+    if (!d) return;
+    d.querySelector('#new-stock-form')?.addEventListener('submit', async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try {
+        await api(`/api/workshop/${currentSlug}/stock/${item.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(Object.fromEntries(fd))
+        });
+        toast('Producto actualizado');
+        d.close();
+        await loadWorkshop();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+    return;
+  }
+
+  const orders = workshopData.orders || [];
+  const orderOptions = orders.map(o =>
+    `<option value="${o.id}" ${presetOrder && String(presetOrder.id) === String(o.id) ? 'selected' : ''}>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)} (${esc(o.client_name || 'Sin cliente')})</option>`
+  ).join('');
+  const defaultDest = presetOrder ? 'purchase' : 'stock';
+
+  const d = modal(presetOrder ? `🛒 Anotar faltante · Orden #${presetOrder.order_number}` : '＋ Nuevo producto / repuesto', `
     <form id="new-stock-form" class="form-grid">
-      <label class="wide">Nombre del producto o repuesto
-        <input name="name" required value="${esc(item?.name || '')}" placeholder="Ej: Módulo Samsung A52 OLED">
-      </label>
-      <label>Categoría
-        <select name="category">
-          ${catOptions}
+      <label class="wide">¿Dónde querés cargarlo?
+        <select name="dest" id="stock-dest-select">
+          <option value="stock" ${defaultDest === 'stock' ? 'selected' : ''}>📦 Stock disponible en el taller</option>
+          <option value="purchase" ${defaultDest === 'purchase' ? 'selected' : ''}>🛒 Lista de compras (Faltante / Para pedir)</option>
         </select>
       </label>
-      <label>Cantidad en stock
-        <input name="quantity" type="number" min="0" step="1" required value="${item ? Number(item.quantity || 0) : 1}">
+
+      <label class="wide">Repuesto o producto (por prioridad)
+        <select name="part_type" id="stock-part-select">
+          ${COMMON_REPAIR_PARTS.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}
+          <option value="__OTHER__">Otro repuesto / producto (escribir manualmente)</option>
+        </select>
       </label>
-      <label>Precio de venta ($)
-        <input name="price" type="number" min="0" step="any" value="${priceVal > 0 ? priceVal : ''}" placeholder="Ej: 45000">
+
+      <label class="wide" id="stock-custom-wrap" style="display:none;">Especificar repuesto o producto
+        <input name="custom_name" id="stock-custom-input" placeholder="Ej: Sensor de proximidad / Cable flex NFC">
       </label>
-      <label>Costo ($) (opcional)
-        <input name="cost" type="number" min="0" step="any" value="${costVal > 0 ? costVal : ''}" placeholder="Ej: 28000">
+
+      <label>Cantidad
+        <input name="quantity" type="number" min="${defaultDest === 'purchase' ? 1 : 0}" step="1" required value="1" id="stock-qty-input">
       </label>
-      <label>SKU / Código (opcional)
-        <input name="sku" value="${esc(item?.sku || '')}" placeholder="Ej: MOD-A52">
+
+      <label id="stock-cat-wrap" style="display:${defaultDest === 'stock' ? 'block' : 'none'};">Categoría
+        <select name="category" id="stock-cat-select">
+          ${categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+        </select>
       </label>
-      <label>Modelos compatibles (opcional)
-        <input name="compatible_models" value="${esc(item?.compatible_models || '')}" placeholder="Ej: A52, A52s">
+
+      <label id="purchase-priority-wrap" style="display:${defaultDest === 'purchase' ? 'block' : 'none'};">Prioridad
+        <select name="priority">
+          <option value="high">Alta (urgente)</option>
+          <option value="normal" selected>Normal</option>
+          <option value="low">Baja</option>
+        </select>
       </label>
+
+      <div id="stock-only-fields" class="wide" style="display:${defaultDest === 'stock' ? 'grid' : 'none'};grid-template-columns:1fr 1fr;gap:12px;">
+        <label>Modelos compatibles (opcional)
+          <input name="compatible_models" id="stock-models-input" placeholder="Ej: Samsung A52, Moto G84">
+        </label>
+        <label>Precio de venta ($)
+          <input name="price" type="number" min="0" step="any" placeholder="Ej: 45000">
+        </label>
+        <label>Costo ($) (opcional)
+          <input name="cost" type="number" min="0" step="any" placeholder="Ej: 28000">
+        </label>
+        <label>SKU / Código (opcional)
+          <input name="sku" placeholder="Ej: MOD-A52">
+        </label>
+      </div>
+
+      <div id="purchase-only-fields" class="wide" style="display:${defaultDest === 'purchase' ? 'grid' : 'none'};grid-template-columns:1fr;gap:12px;">
+        <label>Orden / Equipo vinculado (opcional)
+          <select name="order_id" id="stock-order-select">
+            <option value="">Reposición general / stock</option>
+            ${orderOptions}
+          </select>
+        </label>
+        <label>Nota / Proveedor / Calidad (opcional)
+          <input name="note" placeholder="Ej: Calidad OLED / Mercado Libre / Proveedor local">
+        </label>
+      </div>
+
       <div class="form-actions wide">
-        <button type="submit" class="primary">${item ? 'Guardar cambios' : 'Guardar producto'}</button>
+        <button type="submit" class="primary" id="btn-submit-stock-form">${defaultDest === 'purchase' ? '＋ Agregar a lista de compras' : 'Guardar producto'}</button>
       </div>
     </form>
   `);
 
   if (!d) return;
 
+  const destSel = d.querySelector('#stock-dest-select');
+  const partSel = d.querySelector('#stock-part-select');
+  const customWrap = d.querySelector('#stock-custom-wrap');
+  const customInp = d.querySelector('#stock-custom-input');
+  const catWrap = d.querySelector('#stock-cat-wrap');
+  const prioWrap = d.querySelector('#purchase-priority-wrap');
+  const stockFields = d.querySelector('#stock-only-fields');
+  const purchaseFields = d.querySelector('#purchase-only-fields');
+  const qtyInp = d.querySelector('#stock-qty-input');
+  const submitBtn = d.querySelector('#btn-submit-stock-form');
+
+  const syncDestUI = () => {
+    const isPurchase = destSel?.value === 'purchase';
+    if (catWrap) catWrap.style.display = isPurchase ? 'none' : 'block';
+    if (prioWrap) prioWrap.style.display = isPurchase ? 'block' : 'none';
+    if (stockFields) stockFields.style.display = isPurchase ? 'none' : 'grid';
+    if (purchaseFields) purchaseFields.style.display = isPurchase ? 'grid' : 'none';
+    if (qtyInp) qtyInp.min = isPurchase ? '1' : '0';
+    if (submitBtn) submitBtn.textContent = isPurchase ? '＋ Agregar a lista de compras' : 'Guardar producto';
+  };
+
+  destSel?.addEventListener('change', syncDestUI);
+  partSel?.addEventListener('change', () => {
+    const isOther = partSel.value === '__OTHER__';
+    if (customWrap) customWrap.style.display = isOther ? 'block' : 'none';
+    if (customInp) {
+      customInp.required = isOther;
+      if (isOther) customInp.focus();
+    }
+  });
+
   d.querySelector('#new-stock-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const payload = Object.fromEntries(fd);
+    const dest = String(fd.get('dest') || 'stock');
+    const rawPart = fd.get('part_type') === '__OTHER__'
+      ? String(fd.get('custom_name') || '').trim()
+      : String(fd.get('part_type') || '').replace(/^\d+\s*-\s*/, '').trim();
+
+    if (!rawPart) {
+      toast('Indicá el nombre del producto o repuesto', true);
+      return;
+    }
+
     try {
-      if (item) {
-        await api(`/api/workshop/${currentSlug}/stock/${item.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload)
+      if (dest === 'purchase') {
+        const orderId = String(fd.get('order_id') || '').trim();
+        const linkedOrder = orderId ? orders.find(o => String(o.id) === orderId) : null;
+        const modelSuffix = linkedOrder ? `${linkedOrder.brand || ''} ${linkedOrder.model || ''}`.trim() : '';
+        const fullName = modelSuffix && !rawPart.toLowerCase().includes(modelSuffix.toLowerCase())
+          ? `${rawPart} — ${modelSuffix}`
+          : rawPart;
+
+        await api(`/api/workshop/${currentSlug}/purchases`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: fullName,
+            quantity: Number(fd.get('quantity') || 1),
+            priority: String(fd.get('priority') || 'normal'),
+            order_id: orderId || null,
+            note: String(fd.get('note') || '').trim()
+          })
         });
-        toast('Producto actualizado');
+        toast('Agregado a la lista de compras');
       } else {
+        const models = String(fd.get('compatible_models') || '').trim();
+        const fullName = models && !rawPart.toLowerCase().includes(models.toLowerCase())
+          ? `${rawPart} — ${models}`
+          : rawPart;
+
         await api(`/api/workshop/${currentSlug}/stock`, {
           method: 'POST',
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            name: fullName,
+            category: String(fd.get('category') || 'General'),
+            quantity: Number(fd.get('quantity') || 0),
+            price: Number(fd.get('price') || 0),
+            cost: Number(fd.get('cost') || 0),
+            sku: String(fd.get('sku') || '').trim(),
+            compatible_models: models
+          })
         });
         toast('Producto agregado al stock');
       }
@@ -2137,77 +2327,10 @@ function openNewStockModal(editItem = null) {
   });
 }
 
-// Modal Lista de compras / faltantes
-function openPurchasingModal(presetOrder = null) {
-  const preset = presetOrder && presetOrder.id ? presetOrder : null;
-  const orders = workshopData.orders || [];
-  const orderOptions = orders.map(o =>
-    `<option value="${o.id}" ${preset && String(preset.id) === String(o.id) ? 'selected' : ''}>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)} (${esc(o.client_name || 'Sin cliente')})</option>`
-  ).join('');
-
-  const COMMON_PARTS = [
-    '1 - Pantalla / Módulo completo',
-    '2 - Batería',
-    '3 - Pin de carga / Subplaca de carga',
-    '4 - Tapa trasera / Carcasa',
-    '5 - Glass / Vidrio frontal (remanufactura)',
-    '6 - Flex de encendido / Volumen',
-    '7 - Flex main / Interconexión',
-    '8 - Cámara trasera (módulo)',
-    '9 - Cámara frontal',
-    '10 - Lente / Vidrio de cámara',
-    '11 - Parlante / Buzzer (altavoz)',
-    '12 - Auricular superior',
-    '13 - Micrófono',
-    '14 - Sensor de huella / Biometría',
-    '15 - Lector de SIM / Bandeja SIM',
-    '16 - Antena / Cable coaxial de señal',
-    '17 - Vibrador',
-    '18 - Chasis / Marco intermedio',
-    '19 - Bisagra / Flex de bisagra',
-    '20 - IC de carga / Circuito integrado / PMIC',
-    '21 - Conector FPC / Zócalo en placa',
-    '22 - Adhesivo / Pegamento / Cinta doble faz',
-    '23 - Funda / Vidrio templado / Hidrogel',
-    '24 - Cargador / Cable USB-C / Lightning'
-  ];
-
-  const d = modal(preset ? `🛒 Faltante · Orden #${preset.order_number}` : '🛒 Lista de compras', `
-    <p class="muted" style="margin-top:0;">Elegí el repuesto necesario, vinculalo al equipo si corresponde y organizá los <strong>Pendientes</strong> y los <strong>Pedidos realizados</strong> por internet hasta su ingreso al taller.</p>
-
-    <form id="new-purchase-form" class="form-grid" style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);">
-      <label class="wide">Repuesto o producto a comprar (por prioridad)
-        <select name="part_type" id="purchase-part-select">
-          ${COMMON_PARTS.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}
-          <option value="__OTHER__">Otro repuesto / producto (escribir manualmente)</option>
-        </select>
-      </label>
-      <label class="wide" id="purchase-custom-wrap" style="display:none;">Especificar repuesto o producto
-        <input name="custom_name" id="purchase-custom-input" placeholder="Ej: Sensor de proximidad / Cable flex NFC">
-      </label>
-      <label>Cantidad
-        <input name="quantity" type="number" min="1" step="1" required value="1">
-      </label>
-      <label>Prioridad
-        <select name="priority">
-          <option value="high">Alta (urgente)</option>
-          <option value="normal" selected>Normal</option>
-          <option value="low">Baja</option>
-        </select>
-      </label>
-      <label class="wide">Orden / Equipo vinculado (opcional)
-        <select name="order_id" id="purchase-order-select">
-          <option value="">Reposición general / stock</option>
-          ${orderOptions}
-        </select>
-      </label>
-      <label class="wide">Nota / Proveedor / Calidad (opcional)
-        <input name="note" placeholder="Ej: Calidad OLED / Mercado Libre / Proveedor local">
-      </label>
-      <div class="form-actions wide">
-        <button type="submit" class="primary">＋ Agregar a la lista</button>
-      </div>
-    </form>
+// Modal Lista de compras (solo visualización, gestión de estados y exportación)
+function openPurchasingModal() {
+  const d = modal('🛒 Lista de compras', `
+    <p class="muted" style="margin-top:0;">Acá ves los repuestos <strong>Pendientes de compra</strong> y los <strong>Pedidos realizados</strong> por internet. Para agregar nuevos ítems usá el botón <strong>＋ Nuevo producto / repuesto</strong>.</p>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <input type="search" id="purchasing-search" placeholder="Buscar por repuesto, modelo o proveedor..." style="flex:1;min-width:180px;">
@@ -2219,23 +2342,11 @@ function openPurchasingModal(presetOrder = null) {
 
   if (!d) return;
 
-  const partSel = d.querySelector('#purchase-part-select');
-  const customWrap = d.querySelector('#purchase-custom-wrap');
-  const customInp = d.querySelector('#purchase-custom-input');
   const searchInp = d.querySelector('#purchasing-search');
   const resultsEl = d.querySelector('#purchasing-results');
   const resolveBtn = d.querySelector('#purchasing-resolve-checked');
   const exportBtn = d.querySelector('#purchasing-export');
   const checkedIds = new Set();
-
-  partSel?.addEventListener('change', () => {
-    const isOther = partSel.value === '__OTHER__';
-    if (customWrap) customWrap.style.display = isOther ? 'block' : 'none';
-    if (customInp) {
-      customInp.required = isOther;
-      if (isOther) customInp.focus();
-    }
-  });
 
   const priorityLabel = { high: '🔴 Alta', normal: '🟡 Normal', low: '⚪ Baja' };
 
@@ -2342,46 +2453,6 @@ function openPurchasingModal(presetOrder = null) {
 
   renderList();
   searchInp?.addEventListener('input', renderList);
-
-  d.querySelector('#new-purchase-form')?.addEventListener('submit', async e => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const rawPart = fd.get('part_type') === '__OTHER__'
-      ? String(fd.get('custom_name') || '').trim()
-      : String(fd.get('part_type') || '').replace(/^\d+\s*-\s*/, '').trim();
-    if (!rawPart) {
-      toast('Indicá el repuesto o producto a comprar', true);
-      return;
-    }
-
-    const orderId = String(fd.get('order_id') || '').trim();
-    const linkedOrder = orderId ? orders.find(o => String(o.id) === orderId) : null;
-    const modelSuffix = linkedOrder ? `${linkedOrder.brand || ''} ${linkedOrder.model || ''}`.trim() : '';
-    const fullName = modelSuffix && !rawPart.toLowerCase().includes(modelSuffix.toLowerCase())
-      ? `${rawPart} — ${modelSuffix}`
-      : rawPart;
-
-    try {
-      await api(`/api/workshop/${currentSlug}/purchases`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: fullName,
-          quantity: Number(fd.get('quantity') || 1),
-          priority: String(fd.get('priority') || 'normal'),
-          order_id: orderId || null,
-          note: String(fd.get('note') || '').trim()
-        })
-      });
-      toast('Agregado a la lista de compras');
-      if (customInp) customInp.value = '';
-      const noteInp = e.target.querySelector('input[name="note"]');
-      if (noteInp) noteInp.value = '';
-      await loadWorkshop();
-      renderList();
-    } catch (err) {
-      toast(err.message, true);
-    }
-  });
 
   resolveBtn?.addEventListener('click', async () => {
     const ids = Array.from(checkedIds);

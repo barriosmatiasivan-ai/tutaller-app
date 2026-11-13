@@ -974,7 +974,7 @@ export default {
             LEFT JOIN clients c ON ro.client_id = c.id AND c.workshop_id = ro.workshop_id
             WHERE ro.workshop_id = ? ORDER BY ro.order_number DESC
           `).bind(workshop.id).all(),
-          db.prepare('SELECT * FROM stock_products WHERE workshop_id = ? ORDER BY name ASC').bind(workshop.id).all(),
+          db.prepare('SELECT *, (CAST(sale_price_cents AS REAL) / 100) as price, (CAST(unit_cost_cents AS REAL) / 100) as cost FROM stock_products WHERE workshop_id = ? ORDER BY name ASC').bind(workshop.id).all(),
           db.prepare(`SELECT COALESCE(SUM(CASE WHEN kind='income' THEN amount_cents ELSE 0 END),0)/100.0 AS income,
             COALESCE(SUM(CASE WHEN kind='expense' THEN amount_cents ELSE 0 END),0)/100.0 AS expense,
             COALESCE(SUM(CASE WHEN kind='income' AND payment_method='mercadopago' THEN amount_cents ELSE 0 END),0)/100.0 AS mp
@@ -1252,6 +1252,54 @@ export default {
         await db.batch(statements);
 
         return json({ success: true, id: entryId, order_id: orderId }, 201);
+      }
+
+      // 8. Crear producto / repuesto en stock
+      if (subRoute === 'stock' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const name = typeof body.name === 'string' ? body.name.trim().slice(0, 160) : '';
+        if (!name) return json({ error: 'Ingresá el nombre del producto o repuesto.' }, 400);
+
+        const category = typeof body.category === 'string' && body.category.trim() ? body.category.trim().slice(0, 80) : 'General';
+        const sku = typeof body.sku === 'string' ? body.sku.trim().slice(0, 80) : '';
+        const compatibleModels = typeof body.compatible_models === 'string' ? body.compatible_models.trim().slice(0, 240) : '';
+        const supplier = typeof body.supplier === 'string' ? body.supplier.trim().slice(0, 120) : '';
+        const quantity = Math.max(0, Math.round(Number(body.quantity || 0)));
+        const minimumQuantity = Math.max(0, Math.round(Number(body.minimum_quantity || 0)));
+        const unitCostCents = Math.max(0, Math.round(Number(body.cost || 0) * 100));
+        const salePriceCents = Math.max(0, Math.round(Number(body.price || 0) * 100));
+
+        const id = crypto.randomUUID();
+        const nowIso = new Date().toISOString();
+        await db.prepare(`
+          INSERT INTO stock_products (id, workshop_id, sku, name, category, compatible_models, quantity, minimum_quantity, supplier, unit_cost_cents, sale_price_cents, version, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        `).bind(id, workshop.id, sku, name, category, compatibleModels, quantity, minimumQuantity, supplier, unitCostCents, salePriceCents, nowIso).run();
+
+        return json({ success: true, id }, 201);
+      }
+
+      // 8b. Actualizar cantidad / precio de producto en stock
+      if (subRoute.startsWith('stock/') && request.method === 'PUT') {
+        const stockId = subRoute.split('/')[1];
+        const body = await request.json().catch(() => ({}));
+        const existing = await db.prepare('SELECT * FROM stock_products WHERE id = ? AND workshop_id = ?').bind(stockId, workshop.id).first();
+        if (!existing) return json({ error: 'Producto no encontrado.' }, 404);
+
+        const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 160) : existing.name;
+        const category = typeof body.category === 'string' && body.category.trim() ? body.category.trim().slice(0, 80) : (existing.category || 'General');
+        const sku = typeof body.sku === 'string' ? body.sku.trim().slice(0, 80) : (existing.sku || '');
+        const quantity = body.quantity != null ? Math.max(0, Math.round(Number(body.quantity))) : existing.quantity;
+        const unitCostCents = body.cost != null ? Math.max(0, Math.round(Number(body.cost) * 100)) : existing.unit_cost_cents;
+        const salePriceCents = body.price != null ? Math.max(0, Math.round(Number(body.price) * 100)) : existing.sale_price_cents;
+
+        await db.prepare(`
+          UPDATE stock_products
+          SET name = ?, category = ?, sku = ?, quantity = ?, unit_cost_cents = ?, sale_price_cents = ?, version = version + 1
+          WHERE id = ? AND workshop_id = ?
+        `).bind(name, category, sku, quantity, unitCostCents, salePriceCents, stockId, workshop.id).run();
+
+        return json({ success: true, id: stockId, quantity });
       }
     }
 

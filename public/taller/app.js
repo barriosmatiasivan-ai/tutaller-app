@@ -1547,7 +1547,16 @@ function renderClients() {
 function renderStock() {
   const container = document.querySelector('#stock-container');
   if (!container) return;
-  const items = workshopData.stock || [];
+  let items = workshopData.stock || [];
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    items = items.filter(s =>
+      (s.name && s.name.toLowerCase().includes(q)) ||
+      (s.category && s.category.toLowerCase().includes(q)) ||
+      (s.sku && s.sku.toLowerCase().includes(q)) ||
+      (s.compatible_models && s.compatible_models.toLowerCase().includes(q))
+    );
+  }
 
   if (items.length === 0) {
     container.innerHTML = `
@@ -1564,17 +1573,24 @@ function renderStock() {
   }
 
   container.innerHTML = items.map(s => `
-    <div class="stock-card">
+    <div class="stock-card" data-stock-id="${s.id}" style="cursor:pointer;">
       <div>
         <strong>${esc(s.name)}</strong>
-        <p class="muted">${esc(s.category || 'General')}${s.sku ? ` · SKU: ${esc(s.sku)}` : ''}</p>
+        <p class="muted">${esc(s.category || 'General')}${s.sku ? ` · SKU: ${esc(s.sku)}` : ''}${s.compatible_models ? ` · ${esc(s.compatible_models)}` : ''}</p>
       </div>
       <div class="stock-numbers">
         <strong>${s.quantity || 0} u.</strong>
-        <span class="muted">${formatMoney(s.price || 0)}</span>
+        <span class="muted">${formatMoney(s.price ?? (Number(s.sale_price_cents || 0) / 100))}</span>
       </div>
     </div>
   `).join('');
+
+  container.querySelectorAll('.stock-card[data-stock-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const item = (workshopData.stock || []).find(s => String(s.id) === String(el.dataset.stockId));
+      if (item) openNewStockModal(item);
+    });
+  });
 }
 
 // 5. Render Caja
@@ -1931,6 +1947,74 @@ function openNewCashModal(presetOrder = null) {
   });
 }
 
+// Modal nuevo / editar producto en stock
+function openNewStockModal(editItem = null) {
+  const item = editItem && editItem.id ? editItem : null;
+  const priceVal = item ? (item.price ?? (Number(item.sale_price_cents || 0) / 100)) : '';
+  const costVal = item ? (item.cost ?? (Number(item.unit_cost_cents || 0) / 100)) : '';
+  const categories = ['Pantallas / Módulos', 'Baterías', 'Pines de carga', 'Fundas / Vidrios', 'Cargadores / Cables', 'Herramientas', 'General'];
+  const currentCat = item?.category || 'General';
+  const catOptions = categories.map(c => `<option value="${esc(c)}" ${currentCat === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
+
+  const d = modal(item ? `✏️ Editar producto` : '＋ Nuevo producto / repuesto', `
+    <form id="new-stock-form" class="form-grid">
+      <label class="wide">Nombre del producto o repuesto
+        <input name="name" required value="${esc(item?.name || '')}" placeholder="Ej: Módulo Samsung A52 OLED">
+      </label>
+      <label>Categoría
+        <select name="category">
+          ${catOptions}
+        </select>
+      </label>
+      <label>Cantidad en stock
+        <input name="quantity" type="number" min="0" step="1" required value="${item ? Number(item.quantity || 0) : 1}">
+      </label>
+      <label>Precio de venta ($)
+        <input name="price" type="number" min="0" step="any" value="${priceVal > 0 ? priceVal : ''}" placeholder="Ej: 45000">
+      </label>
+      <label>Costo ($) (opcional)
+        <input name="cost" type="number" min="0" step="any" value="${costVal > 0 ? costVal : ''}" placeholder="Ej: 28000">
+      </label>
+      <label>SKU / Código (opcional)
+        <input name="sku" value="${esc(item?.sku || '')}" placeholder="Ej: MOD-A52">
+      </label>
+      <label>Modelos compatibles (opcional)
+        <input name="compatible_models" value="${esc(item?.compatible_models || '')}" placeholder="Ej: A52, A52s">
+      </label>
+      <div class="form-actions wide">
+        <button type="submit" class="primary">${item ? 'Guardar cambios' : 'Guardar producto'}</button>
+      </div>
+    </form>
+  `);
+
+  if (!d) return;
+
+  d.querySelector('#new-stock-form')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = Object.fromEntries(fd);
+    try {
+      if (item) {
+        await api(`/api/workshop/${currentSlug}/stock/${item.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        toast('Producto actualizado');
+      } else {
+        await api(`/api/workshop/${currentSlug}/stock`, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        toast('Producto agregado al stock');
+      }
+      d.close();
+      await loadWorkshop();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+}
+
 // Modal de soporte y reporte
 function openSupportModal() {
   const appName = currentWorkshop?.name || 'Tu Taller Soft';
@@ -1994,6 +2078,7 @@ function initEvents() {
   document.querySelector('#brand-box')?.addEventListener('click', () => setSection('settings'));
   document.querySelector('#btn-report-issue')?.addEventListener('click', openSupportModal);
   document.querySelector('#btn-cash-new')?.addEventListener('click', openNewCashModal);
+  document.querySelector('#btn-stock-new')?.addEventListener('click', openNewStockModal);
 
   // Onboarding Form (País y Pagos)
   const onbForm = document.querySelector('#onboarding-form');

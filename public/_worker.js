@@ -1171,6 +1171,26 @@ export default {
         return json({ success: true, status: newStatus });
       }
 
+      // 6b. Guardar importe y detalle del presupuesto en la orden
+      if (subRoute.startsWith('orders/') && subRoute.endsWith('/quote') && request.method === 'PUT') {
+        const orderId = subRoute.split('/')[1];
+        const body = await request.json().catch(() => ({}));
+        const rawCost = Number(body.total_cost || 0);
+        if (!Number.isFinite(rawCost) || rawCost < 0 || rawCost > 1000000000) {
+          return json({ error: 'Importe inválido.' }, 400);
+        }
+        const quoteDetail = typeof body.quote_detail === 'string' ? body.quote_detail.trim().slice(0, 2000) : '';
+        const quoteEta = typeof body.quote_eta === 'string' ? body.quote_eta.trim().slice(0, 120) : '';
+        const quoteWarranty = typeof body.quote_warranty === 'string' ? body.quote_warranty.trim().slice(0, 120) : '';
+        const nowIso = new Date().toISOString();
+        await db.prepare(`
+          UPDATE repair_orders
+          SET total_cost = ?, quote_detail = ?, quote_eta = ?, quote_warranty = ?, updated_at = ?
+          WHERE id = ? AND workshop_id = ?
+        `).bind(rawCost, quoteDetail, quoteEta, quoteWarranty, nowIso, orderId, workshop.id).run();
+        return json({ success: true, total_cost: rawCost, quote_detail: quoteDetail, quote_eta: quoteEta, quote_warranty: quoteWarranty });
+      }
+
       // 7. Registrar caja
       if (subRoute === 'cash' && request.method === 'POST') {
         const body = await request.json().catch(() => ({}));

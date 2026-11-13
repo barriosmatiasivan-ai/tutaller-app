@@ -835,7 +835,7 @@ function orderCardHtml(order) {
   const initials = clientInitials(clientName);
   const financeBadgeHtml = saldo > 0
     ? `<span class="order-finance-badge has-debt">Saldo: ${formatMoney(saldo)}</span>`
-    : (total > 0 ? `<span class="order-finance-badge paid">✓ Pagado</span>` : '');
+    : (total > 0 ? `<span class="order-finance-badge" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Presup.: ${formatMoney(total)}</span>` : '');
 
   return `
     <div class="order-card-enhanced" data-order-id="${order.id}">
@@ -938,23 +938,26 @@ function openOrderDetailModal(order) {
         </div>
       </form>
 
-      ${order.client_phone ? `
-        <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);">
-          <label>Generador de presupuesto por WhatsApp</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-            <input type="text" id="quote-detail" placeholder="Trabajo / repuesto (ej: Cambio de módulo)" value="${esc(order.public_diagnosis || order.fault || '')}" style="grid-column:1 / -1;">
-            <input type="number" id="quote-amount" min="0" step="any" placeholder="Importe total ($)" value="${Number(order.total_cost || 0) > 0 ? Number(order.total_cost) : ''}">
-            <input type="text" id="quote-eta" placeholder="Demora (ej: En el día)">
-            <input type="text" id="quote-warranty" placeholder="Garantía (ej: 30 días)" style="grid-column:1 / -1;">
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-            <button type="button" class="primary compact" id="btn-send-quote-wa">💬 Enviar presupuesto (wa.me)</button>
-            <button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>
-            <button type="button" class="secondary compact" id="btn-quote-png">🖼 Imagen (PNG)</button>
-            <button type="button" class="secondary compact" id="btn-quote-pdf">📄 PDF / Imprimir</button>
-          </div>
+      <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);">
+        <label>Presupuesto e importe</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+          <input type="text" id="quote-detail" placeholder="Trabajo / repuesto (ej: Cambio de módulo)" value="${esc(order.quote_detail || order.public_diagnosis || order.fault || '')}" style="grid-column:1 / -1;">
+          <input type="number" id="quote-amount" min="0" step="any" placeholder="Importe total ($)" value="${Number(order.total_cost || 0) > 0 ? Number(order.total_cost) : ''}">
+          <input type="text" id="quote-eta" placeholder="Demora (ej: En el día)" value="${esc(order.quote_eta || '')}">
+          <input type="text" id="quote-warranty" placeholder="Garantía (ej: 30 días)" value="${esc(order.quote_warranty || '')}" style="grid-column:1 / -1;">
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+          <button type="button" class="primary compact" id="btn-save-quote">💾 Guardar importe</button>
+          ${order.client_phone ? `
+            <button type="button" class="secondary compact" id="btn-send-quote-wa">💬 Enviar (wa.me)</button>
+            <button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>
+          ` : ''}
+          <button type="button" class="secondary compact" id="btn-quote-png">🖼 Imagen (PNG)</button>
+          <button type="button" class="secondary compact" id="btn-quote-pdf">📄 PDF / Imprimir</button>
+        </div>
+      </div>
 
+      ${order.client_phone ? `
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
           <label>Aviso rápido por WhatsApp</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
@@ -1047,9 +1050,53 @@ function openOrderDetailModal(order) {
     return lines.join('\n');
   };
 
+  const saveOrderQuote = async (silent = false) => {
+    const detail = (d.querySelector('#quote-detail')?.value || '').trim();
+    const rawAmount = d.querySelector('#quote-amount')?.value;
+    const amountNum = rawAmount === '' || rawAmount == null ? 0 : Number(rawAmount);
+    const eta = (d.querySelector('#quote-eta')?.value || '').trim();
+    const warranty = (d.querySelector('#quote-warranty')?.value || '').trim();
+
+    if (!Number.isFinite(amountNum) || amountNum < 0) {
+      if (!silent) toast('Ingresá un importe válido', true);
+      return false;
+    }
+
+    const res = await api(`/api/workshop/${currentSlug}/orders/${order.id}/quote`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        total_cost: amountNum,
+        quote_detail: detail,
+        quote_eta: eta,
+        quote_warranty: warranty
+      })
+    });
+
+    order.total_cost = res.total_cost ?? amountNum;
+    order.quote_detail = res.quote_detail ?? detail;
+    order.quote_eta = res.quote_eta ?? eta;
+    order.quote_warranty = res.quote_warranty ?? warranty;
+    renderCurrentSection();
+    if (!silent) toast('Importe y presupuesto guardados');
+    return true;
+  };
+
+  const saveQuoteBtn = d.querySelector('#btn-save-quote');
+  saveQuoteBtn?.addEventListener('click', async () => {
+    saveQuoteBtn.disabled = true;
+    try {
+      await saveOrderQuote(false);
+    } catch (err) {
+      toast(err.message || 'No se pudo guardar el importe', true);
+    } finally {
+      saveQuoteBtn.disabled = false;
+    }
+  });
+
   d.querySelector('#btn-send-quote-wa')?.addEventListener('click', () => {
     const msg = buildQuoteMessage();
     if (!msg) return;
+    saveOrderQuote(true).catch(() => {});
     const waPhone = formatWaMePhone(order.client_phone);
     window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
   });
@@ -1057,6 +1104,7 @@ function openOrderDetailModal(order) {
   d.querySelector('#btn-send-quote-bot')?.addEventListener('click', async () => {
     const msg = buildQuoteMessage();
     if (!msg) return;
+    saveOrderQuote(true).catch(() => {});
     toast('Enviando presupuesto por WhatsApp... ⏳');
     const res = await sendWaBotMessage(order.client_phone, msg);
     if (res && res.success) {
@@ -1069,6 +1117,7 @@ function openOrderDetailModal(order) {
   d.querySelector('#btn-quote-png')?.addEventListener('click', async () => {
     const q = getQuoteData();
     if (!q) return;
+    saveOrderQuote(true).catch(() => {});
     try {
       const canvas = document.createElement('canvas');
       canvas.width = 960;
@@ -1275,6 +1324,7 @@ function openOrderDetailModal(order) {
   d.querySelector('#btn-quote-pdf')?.addEventListener('click', () => {
     const q = getQuoteData();
     if (!q) return;
+    saveOrderQuote(true).catch(() => {});
     const win = window.open('', '_blank', 'width=860,height=920');
     if (!win) {
       toast('Habilitá las ventanas emergentes para generar el PDF', true);

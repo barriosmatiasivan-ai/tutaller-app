@@ -3404,35 +3404,10 @@ function setupWorkshopAuthListeners() {
   logoutHeader?.addEventListener('click', handleLogout);
 }
 
-// Conmutador de Interfaz (Clásica vs Moderna Pro)
+// Interfaz única Moderna Pro (vista clásica deshabilitada)
 function setupUISwitcher() {
-  const btn = document.querySelector('#btn-toggle-ui');
-  const iconEl = document.querySelector('#ui-switch-icon');
-  const labelEl = document.querySelector('#ui-switch-label');
-
-  function applyUIMode(mode) {
-    if (mode === 'pro') {
-      document.documentElement.setAttribute('data-ui', 'pro');
-      if (iconEl) iconEl.textContent = '✨';
-      if (labelEl) labelEl.textContent = 'Vista: Pro';
-    } else {
-      document.documentElement.removeAttribute('data-ui');
-      if (iconEl) iconEl.textContent = '🎨';
-      if (labelEl) labelEl.textContent = 'Vista: Clásica';
-    }
-  }
-
-  // Cargar preferencia guardada (por defecto 'pro')
-  const savedMode = localStorage.getItem('tutaller_ui_mode') || 'pro';
-  applyUIMode(savedMode);
-
-  btn?.addEventListener('click', () => {
-    const isPro = document.documentElement.getAttribute('data-ui') === 'pro';
-    const nextMode = isPro ? 'classic' : 'pro';
-    localStorage.setItem('tutaller_ui_mode', nextMode);
-    applyUIMode(nextMode);
-    toast(nextMode === 'pro' ? '✨ Interfaz Moderna Pro activada' : '🎨 Interfaz Clásica activada');
-  });
+  document.documentElement.setAttribute('data-ui', 'pro');
+  try { localStorage.setItem('tutaller_ui_mode', 'pro'); } catch {}
 }
 
 // Iniciar aplicación al cargar el DOM con soporte para carga diferida o asíncrona

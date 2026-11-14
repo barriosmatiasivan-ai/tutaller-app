@@ -722,11 +722,11 @@ export default {
         }
 
         // Generar PIN de 6 dígitos
-        if (!env.RESEND_API_KEY) return json({ error: 'Correo de acceso no disponible.' }, 503);
+        const isStagingNoEmail = env.ENVIRONMENT === 'staging' && !env.RESEND_API_KEY;
+        if (!env.RESEND_API_KEY && !isStagingNoEmail) return json({ error: 'Correo de acceso no disponible.' }, 503);
         const since = new Date(Date.now() - 15 * 60000).toISOString();
         const recent = await db.prepare('SELECT COUNT(*) AS n FROM workshop_login_codes WHERE workshop_id=? AND email=? AND created_at>?').bind(workshop.id, email, since).first();
         if (recent.n >= 3) return json({ error: 'Esperá antes de pedir otro código.' }, 429);
-        const isStagingNoEmail = env.ENVIRONMENT === 'staging' && !env.RESEND_API_KEY;
         const pinCode = isStagingNoEmail
           ? '123456'
           : String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);

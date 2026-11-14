@@ -2903,9 +2903,9 @@ function openNewStockModal(editOrOpts = null) {
 // Modal Lista de compras (solo visualización, gestión de estados y exportación)
 function openPurchasingModal() {
   const d = modal('🛒 Lista de compras', `
-    <p class="muted" style="margin-top:0;">Acá ves los repuestos <strong>Pendientes de compra</strong> y los <strong>Pedidos realizados</strong> por internet. Para agregar nuevos ítems usá el botón <strong>＋ Nuevo producto / repuesto</strong>.</p>
+    <p class="muted purchasing-intro" style="margin-top:0;">Acá ves los repuestos <strong>Pendientes de compra</strong> y los <strong>Pedidos realizados</strong> por internet. Para agregar nuevos ítems usá el botón <strong>＋ Nuevo producto / repuesto</strong>.</p>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+    <div class="purchasing-toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <input type="search" id="purchasing-search" placeholder="Buscar por repuesto, modelo o proveedor..." style="flex:1;min-width:180px;">
       <button type="button" class="primary compact" id="purchasing-resolve-checked" disabled>✓ Marcar ingreso / comprados</button>
       <button type="button" class="secondary compact" id="purchasing-export">⬇ Exportar CSV</button>

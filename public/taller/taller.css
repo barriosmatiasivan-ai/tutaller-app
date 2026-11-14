@@ -1652,7 +1652,8 @@ body.is-login #workshop-login-view {
   .order-card-enhanced .phone-icon,
   .order-card-enhanced .client-avatar-pro,
   .order-card-enhanced .client-info-pro span,
-  .order-card-enhanced .order-actions-btns > :not(.btn-wa-action),
+  .order-card-enhanced .order-actions-btns > .btn-qr-action,
+  .order-card-enhanced .btn-quick-charge .quick-charge-label,
   .order-card-enhanced .btn-wa-action .wa-pro-content span,
   .order-card-enhanced .order-stepper-wrap > :not(.order-stepper-right) {
     display: none !important;
@@ -1725,14 +1726,18 @@ body.is-login #workshop-login-view {
     grid-row: 2;
     justify-self: end;
     margin: 0 !important;
+    gap: 4px !important;
   }
-  .order-card-enhanced .btn-wa-action {
+  .order-card-enhanced .btn-wa-action,
+  .order-card-enhanced .btn-quick-photo,
+  .order-card-enhanced .btn-quick-charge {
     padding: 0 !important;
     width: 30px !important;
     height: 30px !important;
     min-height: 30px !important;
     justify-content: center !important;
     border-radius: 8px !important;
+    font-size: 13px !important;
   }
 
   /* 6. Lista de compras Pocket ("en proveedor", sin basura) */
@@ -1795,4 +1800,131 @@ body.is-login #workshop-login-view {
     min-height: 30px !important;
   }
 }
+
+/* Quick status 1-tap badge & floating popover */
+.badge-quick-status {
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-family: inherit;
+  transition: transform 0.12s ease, filter 0.15s ease;
+}
+.badge-quick-status:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+.badge-quick-status .badge-caret {
+  opacity: 0.7;
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+.quick-status-popover {
+  position: fixed;
+  z-index: 420;
+  min-width: 210px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #101b15;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.quick-status-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 2px;
+}
+.quick-status-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.quick-status-opt:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.quick-status-opt.active {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  font-weight: 700;
+}
+.quick-status-opt .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+  flex-shrink: 0;
+}
+.quick-status-opt .dot.repairing { background: #38bdf8; }
+.quick-status-opt .dot.parts { background: #fbbf24; }
+.quick-status-opt .dot.ready { background: #34d399; }
+.quick-status-opt .dot.delivered { background: #94a3b8; }
+.quick-status-opt .dot.cancelled { background: #f87171; }
+.quick-status-opt .check {
+  margin-left: auto;
+  color: #34d399;
+  font-weight: 700;
+}
+
+.btn-quick-photo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-quick-photo:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.btn-quick-charge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 9px;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-quick-charge:hover {
+  background: #10b981;
+  color: #041f14;
+}
+
+#btn-cash-privacy.active {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+  color: #fbbf24 !important;
+}
+
 

@@ -6,6 +6,9 @@ let workshopData = { orders: [], clients: [], stock: [], cash_entries: [] };
 let activeSection = 'home';
 let searchQuery = '';
 let orderStatusFilter = '';
+let cashPrivacyHidden = (() => {
+  try { return localStorage.getItem('tutaller_cash_privacy') === '1'; } catch { return false; }
+})();
 
 const STATUS_CONFIG = {
   received: { label: 'Recibido', class: 'repairing' },
@@ -942,6 +945,15 @@ function orderCardHtml(order) {
         </div>
       </div>
       <div class="order-actions-btns" onclick="event.stopPropagation();">
+        ${order.status === 'ready' ? `
+          <button type="button" class="order-action-icon btn-quick-charge" data-order-id="${order.id}" title="Cobrar y entregar equipo">
+            <span>💵</span>
+            <span class="quick-charge-label">Cobrar / Entregar</span>
+          </button>
+        ` : ''}
+        <button type="button" class="order-action-icon btn-quick-photo" data-order-id="${order.id}" title="Sacar o adjuntar foto al equipo">
+          <span>📷</span>
+        </button>
         ${waPhone ? `
           <a class="order-action-icon btn-wa-action" href="https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${clientName}, te escribimos de ${currentWorkshop?.name || 'el taller'} sobre tu orden #${order.order_number} (${order.brand} ${order.model}): estado actual: ${st.label}.`)}" target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp al cliente">
             <span class="wa-pro-content">
@@ -957,7 +969,7 @@ function orderCardHtml(order) {
       <div class="order-stepper-wrap">
         ${renderOrderStepper(order.status)}
         <div class="order-stepper-right">
-          <span class="badge ${st.class}"><span class="dot"></span>${st.label}</span>
+          <button type="button" class="badge ${st.class} badge-quick-status" data-order-id="${order.id}" title="Tocar para cambiar estado"><span class="dot"></span>${st.label} <span class="badge-caret">▾</span></button>
           ${financeBadgeHtml}
         </div>
       </div>
@@ -965,12 +977,145 @@ function orderCardHtml(order) {
   `;
 }
 
+let activeQuickStatusPopover = null;
+function closeQuickStatusPopover() {
+  if (activeQuickStatusPopover) {
+    activeQuickStatusPopover.remove();
+    activeQuickStatusPopover = null;
+  }
+}
+
+function openQuickStatusPopover(anchorEl, order) {
+  closeQuickStatusPopover();
+  const pop = document.createElement('div');
+  pop.className = 'quick-status-popover';
+  const statuses = [
+    ['received', 'Recibido'],
+    ['in_progress', 'En reparación'],
+    ['waiting_parts', 'Esperando repuesto'],
+    ['ready', 'Listo para retirar'],
+    ['delivered', 'Entregado'],
+    ['cancelled', 'Cancelado']
+  ];
+  pop.innerHTML = `
+    <div class="quick-status-title">Orden #${order.order_number} · Cambiar estado</div>
+    ${statuses.map(([key, label]) => `
+      <button type="button" class="quick-status-opt ${order.status === key ? 'active' : ''}" data-status="${key}">
+        <span class="dot ${STATUS_CONFIG[key]?.class || ''}"></span>
+        <span>${label}</span>
+        ${order.status === key ? '<span class="check">✓</span>' : ''}
+      </button>
+    `).join('')}
+  `;
+  document.body.appendChild(pop);
+  activeQuickStatusPopover = pop;
+
+  const rect = anchorEl.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  const top = Math.min(window.innerHeight - popRect.height - 12, Math.max(12, rect.bottom + 6));
+  const left = Math.min(window.innerWidth - popRect.width - 12, Math.max(12, rect.right - popRect.width));
+  pop.style.top = `${top}px`;
+  pop.style.left = `${left}px`;
+
+  pop.addEventListener('click', ev => ev.stopPropagation());
+  pop.querySelectorAll('.quick-status-opt').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const newStatus = btn.dataset.status;
+      if (!newStatus || newStatus === order.status) {
+        closeQuickStatusPopover();
+        return;
+      }
+      pop.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      try {
+        await api(`/api/workshop/${currentSlug}/orders/${order.id}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ status: newStatus, public_diagnosis: order.public_diagnosis || '' })
+        });
+        order.status = newStatus;
+        closeQuickStatusPopover();
+        toast(`Orden #${order.order_number} → ${STATUS_CONFIG[newStatus]?.label || newStatus}`);
+        renderCurrentSection();
+        if (newStatus === 'ready' && isBotEnabledForWorkshop()) {
+          triggerAutoWhatsApp(order, 'ready');
+        }
+      } catch (err) {
+        toast(err.message, true);
+        pop.querySelectorAll('button').forEach(b => { b.disabled = false; });
+      }
+    });
+  });
+
+  setTimeout(() => {
+    const onDocClick = () => {
+      closeQuickStatusPopover();
+      document.removeEventListener('click', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+    const onEsc = e => {
+      if (e.key === 'Escape') onDocClick();
+    };
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onEsc);
+  }, 0);
+}
+
+let quickPhotoOrderTarget = null;
+function triggerQuickOrderPhoto(order) {
+  let inp = document.querySelector('#quick-card-photo-input');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file';
+    inp.id = 'quick-card-photo-input';
+    inp.accept = 'image/*';
+    inp.setAttribute('capture', 'environment');
+    inp.multiple = true;
+    inp.hidden = true;
+    document.body.appendChild(inp);
+    inp.addEventListener('change', async e => {
+      const targetOrder = quickPhotoOrderTarget;
+      const files = Array.from(e.target.files || []);
+      inp.value = '';
+      if (!targetOrder || !files.length) return;
+      toast(`Subiendo ${files.length} foto(s) a Orden #${targetOrder.order_number}... ⏳`);
+      try {
+        await savePendingPhotos(targetOrder.id, files);
+        toast(`✅ ${files.length} foto(s) guardada(s) en Orden #${targetOrder.order_number}`);
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+  }
+  quickPhotoOrderTarget = order;
+  inp.click();
+}
+
 function bindOrderCardClicks(parent) {
-  parent.querySelectorAll('[data-order-id]').forEach(el => {
+  parent.querySelectorAll('[data-order-id].order-card-enhanced').forEach(el => {
     el.addEventListener('click', () => {
       const oid = el.dataset.orderId;
       const order = workshopData.orders.find(o => o.id === oid);
       if (order) openOrderDetailModal(order);
+    });
+  });
+  parent.querySelectorAll('.badge-quick-status').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const order = workshopData.orders.find(o => String(o.id) === String(btn.dataset.orderId));
+      if (order) openQuickStatusPopover(btn, order);
+    });
+  });
+  parent.querySelectorAll('.btn-quick-photo').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const order = workshopData.orders.find(o => String(o.id) === String(btn.dataset.orderId));
+      if (order) triggerQuickOrderPhoto(order);
+    });
+  });
+  parent.querySelectorAll('.btn-quick-charge').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const order = workshopData.orders.find(o => String(o.id) === String(btn.dataset.orderId));
+      if (order) openNewCashModal(order, { markDeliveredDefault: true });
     });
   });
 }
@@ -2045,11 +2190,27 @@ function renderCash() {
   const entries = workshopData.cash_entries || [];
 
   const {income=0, expense=0, mp:mpTotal=0} = workshopData.cash_totals || {};
+  const maskMoney = val => cashPrivacyHidden ? '$ •••••' : formatMoney(val);
 
-  setText('#cash-income-total', formatMoney(income));
-  setText('#cash-expense-total', formatMoney(expense));
-  setText('#cash-mp-total', formatMoney(mpTotal));
-  setText('#cash-net-total', formatMoney(income - expense));
+  setText('#cash-income-total', maskMoney(income));
+  setText('#cash-expense-total', maskMoney(expense));
+  setText('#cash-mp-total', maskMoney(mpTotal));
+  setText('#cash-net-total', maskMoney(income - expense));
+
+  const privacyBtn = document.querySelector('#btn-cash-privacy');
+  if (privacyBtn) {
+    privacyBtn.textContent = cashPrivacyHidden ? '🙈 Mostrar montos' : '👁 Ocultar montos';
+    privacyBtn.setAttribute('aria-pressed', cashPrivacyHidden ? 'true' : 'false');
+    privacyBtn.classList.toggle('active', cashPrivacyHidden);
+    if (!privacyBtn.dataset.cashPrivacyBound) {
+      privacyBtn.dataset.cashPrivacyBound = '1';
+      privacyBtn.addEventListener('click', () => {
+        cashPrivacyHidden = !cashPrivacyHidden;
+        try { localStorage.setItem('tutaller_cash_privacy', cashPrivacyHidden ? '1' : '0'); } catch {}
+        renderCash();
+      });
+    }
+  }
 
   const searchInp = document.querySelector('#cash-filter-search');
   const typeSel = document.querySelector('#cash-filter-type');
@@ -2139,7 +2300,7 @@ function renderCash() {
       </div>
       <div class="cash-row-amount">
         <strong style="color:${e.type === 'income' ? '#34d399' : '#f87171'};">
-          ${e.type === 'income' ? '+' : '-'}${formatMoney(e.amount)}
+          ${e.type === 'income' ? '+' : '-'}${maskMoney(e.amount)}
         </strong>
       </div>
     </div>
@@ -2345,7 +2506,7 @@ function openNewClientModal() {
 }
 
 // Modal nuevo movimiento de caja
-function openNewCashModal(presetOrder = null) {
+function openNewCashModal(presetOrder = null, opts = {}) {
   const preset = presetOrder && presetOrder.id ? presetOrder : null;
   const orders = workshopData.orders || [];
   const orderOptions = orders.map(o => {
@@ -2357,6 +2518,11 @@ function openNewCashModal(presetOrder = null) {
       : '';
     return `<option value="${o.id}" ${preset && String(preset.id) === String(o.id) ? 'selected' : ''}>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)} (${esc(o.client_name || 'Sin cliente')})${extra}</option>`;
   }).join('');
+
+  const presetTotal = preset ? Number(preset.total_cost || 0) : 0;
+  const presetPaid = preset ? Number(preset.paid_cents || 0) / 100 : 0;
+  const presetSaldo = Math.max(0, presetTotal - presetPaid);
+  const showDeliverOnly = Boolean(preset && preset.status !== 'delivered' && presetTotal > 0 && presetSaldo <= 0);
 
   const modalTitle = preset ? `💵 Cobrar Orden #${preset.order_number}` : '＋ Nuevo movimiento de caja';
   const d = modal(modalTitle, `
@@ -2388,7 +2554,12 @@ function openNewCashModal(presetOrder = null) {
       <label>Concepto o descripción
         <input name="concept" id="cash-concept-input" required placeholder="Ej: Cobro pantalla Motorola G84">
       </label>
-      <div class="form-actions wide">
+      <label class="checkbox-pill wide" id="cash-deliver-wrap" style="display:none;margin-top:2px;">
+        <input type="checkbox" id="cash-mark-delivered" ${opts.markDeliveredDefault ? 'checked' : ''}>
+        ✅ Marcar orden como Entregada al registrar el cobro
+      </label>
+      <div class="form-actions wide" style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${showDeliverOnly ? `<button type="button" class="secondary" id="btn-cash-deliver-only">✅ Ya abonado · Marcar Entregado</button>` : ''}
         <button type="submit" class="primary">Registrar movimiento</button>
       </div>
     </form>
@@ -2401,13 +2572,19 @@ function openNewCashModal(presetOrder = null) {
   const amountInp = d.querySelector('#cash-amount-input');
   const conceptInp = d.querySelector('#cash-concept-input');
   const typeSel = d.querySelector('#cash-type-select');
+  const deliverWrap = d.querySelector('#cash-deliver-wrap');
+  const deliverChk = d.querySelector('#cash-mark-delivered');
 
   const syncOrderSelection = (forceFill = false) => {
     const selectedId = orderSel?.value;
     const ord = orders.find(o => String(o.id) === String(selectedId));
     if (!ord) {
       if (summaryEl) summaryEl.style.display = 'none';
+      if (deliverWrap) deliverWrap.style.display = 'none';
       return;
+    }
+    if (deliverWrap) {
+      deliverWrap.style.display = (ord.status !== 'delivered' && typeSel?.value === 'income') ? 'inline-flex' : 'none';
     }
     const total = Number(ord.total_cost || 0);
     const paid = Number(ord.paid_cents || 0) / 100;
@@ -2429,17 +2606,48 @@ function openNewCashModal(presetOrder = null) {
   };
 
   orderSel?.addEventListener('change', () => syncOrderSelection(true));
+  typeSel?.addEventListener('change', () => syncOrderSelection(false));
   if (preset) syncOrderSelection(true);
+
+  d.querySelector('#btn-cash-deliver-only')?.addEventListener('click', async () => {
+    if (!preset) return;
+    try {
+      await api(`/api/workshop/${currentSlug}/orders/${preset.id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'delivered', public_diagnosis: preset.public_diagnosis || '' })
+      });
+      toast(`✅ Orden #${preset.order_number} marcada como Entregada`);
+      d.close();
+      await loadWorkshop();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
 
   d.querySelector('#new-cash-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const payload = Object.fromEntries(fd);
+    const shouldDeliver = Boolean(
+      deliverChk?.checked &&
+      payload.order_id &&
+      payload.type === 'income'
+    );
     try {
       await api(`/api/workshop/${currentSlug}/cash`, {
         method: 'POST',
-        body: JSON.stringify(Object.fromEntries(fd))
+        body: JSON.stringify(payload)
       });
-      toast('Movimiento registrado');
+      if (shouldDeliver) {
+        const ord = orders.find(o => String(o.id) === String(payload.order_id));
+        if (ord && ord.status !== 'delivered') {
+          await api(`/api/workshop/${currentSlug}/orders/${ord.id}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'delivered', public_diagnosis: ord.public_diagnosis || '' })
+          });
+        }
+      }
+      toast(shouldDeliver ? '✅ Cobro registrado y orden marcada como Entregada' : 'Movimiento registrado');
       d.close();
       await loadWorkshop();
     } catch (err) {

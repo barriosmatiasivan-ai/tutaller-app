@@ -1017,6 +1017,8 @@ html[data-ui="pro"] .stock-card {
   background: rgba(255, 255, 255, 0.025) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 12px !important;
+  padding: 14px 18px !important;
+  margin-bottom: 10px;
   transition: all 0.15s ease;
 }
 html[data-ui="pro"] .client-row:hover,

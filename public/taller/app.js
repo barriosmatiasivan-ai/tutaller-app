@@ -1048,12 +1048,15 @@ function openOrderDetailModal(order) {
           <button type="button" class="primary compact" id="btn-order-charge" style="background:#059669;">💵 Cobrar</button>
           <button type="button" class="secondary compact" id="btn-order-need-part">🛒 Faltante</button>
           <button type="button" class="secondary compact" id="btn-order-use-stock">📦 Usar stock</button>
-          ${order.client_phone ? `
-            <button type="button" class="secondary compact" id="btn-send-quote-wa">💬 Enviar (wa.me)</button>
-            ${isBotEnabledForWorkshop() ? `<button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Enviar con Bot QR</button>` : ''}
-          ` : ''}
+          <button type="button" class="primary compact" id="btn-send-quote-unified" style="background:#0f766e;">📤 Enviar presupuesto</button>
+        </div>
+        <div id="quote-inline-feedback" style="display:none;margin-top:8px;font-size:12.5px;padding:7px 10px;border-radius:8px;"></div>
+        <div id="quote-send-options" hidden style="margin-top:8px;padding:10px;border-radius:10px;border:1px solid rgba(52,211,153,0.35);background:rgba(16,185,129,0.08);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <span style="font-size:12px;font-weight:600;color:#6ee7b7;width:100%;">Elegí cómo enviar el presupuesto:</span>
           <button type="button" class="secondary compact" id="btn-quote-png">🖼 Imagen (PNG)</button>
           <button type="button" class="secondary compact" id="btn-quote-pdf">📄 PDF / Imprimir</button>
+          <button type="button" class="secondary compact" id="btn-send-quote-wa">💬 Escrito (${order.client_phone ? 'WhatsApp' : 'Copiar texto'})</button>
+          ${order.client_phone && isBotEnabledForWorkshop() ? `<button type="button" class="secondary compact" id="btn-send-quote-bot">🤖 Bot QR</button>` : ''}
         </div>
         ${(() => {
           const linkedNeeds = (workshopData.purchase_needs || []).filter(p => String(p.order_id) === String(order.id));
@@ -1125,6 +1128,18 @@ function openOrderDetailModal(order) {
     }
   });
 
+  const showQuoteFeedback = (msg, isError = false) => {
+    const fb = d.querySelector('#quote-inline-feedback');
+    if (fb) {
+      fb.textContent = msg;
+      fb.style.display = 'block';
+      fb.style.background = isError ? 'rgba(239,68,68,0.14)' : 'rgba(16,185,129,0.14)';
+      fb.style.color = isError ? '#fca5a5' : '#6ee7b7';
+      fb.style.border = isError ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(16,185,129,0.35)';
+    }
+    toast(msg, isError);
+  };
+
   const getQuoteData = () => {
     const detail = (d.querySelector('#quote-detail')?.value || '').trim();
     const rawAmount = d.querySelector('#quote-amount')?.value;
@@ -1132,9 +1147,11 @@ function openOrderDetailModal(order) {
     const eta = (d.querySelector('#quote-eta')?.value || '').trim();
     const warranty = (d.querySelector('#quote-warranty')?.value || '').trim();
     if (!detail && !(amountNum > 0)) {
-      toast('Ingresá al menos el trabajo o el importe del presupuesto', true);
+      showQuoteFeedback('Ingresá al menos el trabajo o el importe del presupuesto', true);
       return null;
     }
+    const fb = d.querySelector('#quote-inline-feedback');
+    if (fb) fb.style.display = 'none';
     return {
       detail,
       amountNum,
@@ -1227,12 +1244,33 @@ function openOrderDetailModal(order) {
     openNewStockModal({ presetOrder: order, forceMode: 'stock' });
   });
 
-  d.querySelector('#btn-send-quote-wa')?.addEventListener('click', () => {
+  const quoteOptionsEl = d.querySelector('#quote-send-options');
+  if (quoteOptionsEl) quoteOptionsEl.style.display = 'none';
+
+  d.querySelector('#btn-send-quote-unified')?.addEventListener('click', () => {
+    if (!getQuoteData()) return;
+    if (!quoteOptionsEl) return;
+    const isHidden = quoteOptionsEl.hidden || quoteOptionsEl.style.display === 'none';
+    quoteOptionsEl.hidden = !isHidden;
+    quoteOptionsEl.style.display = isHidden ? 'flex' : 'none';
+  });
+
+  d.querySelector('#btn-send-quote-wa')?.addEventListener('click', async () => {
     const msg = buildQuoteMessage();
     if (!msg) return;
     saveOrderQuote(true).catch(() => {});
     const waPhone = formatWaMePhone(order.client_phone);
-    window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+    if (waPhone) {
+      window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+      showQuoteFeedback('💬 Abriendo WhatsApp con el presupuesto escrito');
+    } else {
+      try {
+        await navigator.clipboard.writeText(msg);
+        showQuoteFeedback('📋 Presupuesto escrito copiado al portapapeles');
+      } catch {
+        prompt('Copiá el presupuesto escrito:', msg);
+      }
+    }
   });
 
   d.querySelector('#btn-send-quote-bot')?.addEventListener('click', async () => {
@@ -1442,16 +1480,17 @@ function openOrderDetailModal(order) {
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: `Presupuesto Orden #${q.orderNumber}` });
+        showQuoteFeedback('🖼 Presupuesto compartido como imagen PNG');
       } else {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = fileName;
         a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-        toast('🖼 Imagen del presupuesto descargada');
+        showQuoteFeedback('🖼 Imagen del presupuesto descargada');
       }
     } catch (err) {
-      if (err?.name !== 'AbortError') toast(`Error generando imagen: ${err.message}`, true);
+      if (err?.name !== 'AbortError') showQuoteFeedback(`Error generando imagen: ${err.message}`, true);
     }
   });
 
@@ -1459,13 +1498,22 @@ function openOrderDetailModal(order) {
     const q = getQuoteData();
     if (!q) return;
     saveOrderQuote(true).catch(() => {});
+    const todayStr = new Date().toLocaleDateString('es-AR');
     const win = window.open('', '_blank', 'width=860,height=920');
-    if (!win) {
-      toast('Habilitá las ventanas emergentes para generar el PDF', true);
+    let printFrame = null;
+    let targetDoc = win?.document;
+    if (!targetDoc) {
+      printFrame = document.createElement('iframe');
+      printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+      document.body.appendChild(printFrame);
+      targetDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+    }
+    if (!targetDoc) {
+      showQuoteFeedback('No se pudo abrir la vista de impresión/PDF', true);
       return;
     }
-    const todayStr = new Date().toLocaleDateString('es-AR');
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Presupuesto Orden #${q.orderNumber}</title>
+    targetDoc.open();
+    targetDoc.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Presupuesto Orden #${q.orderNumber}</title>
       <style>
         *{box-sizing:border-box;}
         body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;background:#eef2f6;color:#0f172a;padding:28px 18px;}
@@ -1546,7 +1594,17 @@ function openOrderDetailModal(order) {
         </div>
       </div>
       <script>window.onload=()=>{setTimeout(()=>window.print(),250);};</script></body></html>`);
-    win.document.close();
+    targetDoc.close();
+    if (printFrame) {
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow?.focus();
+          printFrame.contentWindow?.print();
+        } finally {
+          setTimeout(() => printFrame.remove(), 60000);
+        }
+      }, 300);
+    }
   });
 
   d.querySelector('#btn-modal-send-wa-bot')?.addEventListener('click', async () => {

@@ -1372,8 +1372,10 @@ body.is-login #workshop-login-view {
     display: flex !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
+    height: auto !important;
+    min-height: 52px !important;
     gap: 8px !important;
-    padding: 8px 12px !important;
+    padding: 6px 10px !important;
   }
   .topbar .mobile-brand {
     order: 1;

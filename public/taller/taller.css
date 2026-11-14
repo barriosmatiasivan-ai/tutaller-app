@@ -1351,55 +1351,448 @@ body.is-login #workshop-login-view {
   }
 }
 
+/* Agenda de clientes interactiva y ficha de cliente */
+.client-row-interactive {
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.client-row-interactive:hover {
+  border-color: rgba(52, 211, 153, 0.35) !important;
+}
+.client-row-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.client-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.client-row-note {
+  display: block;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.client-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.client-wa-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.client-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.client-summary-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.client-summary-box span {
+  font-size: 11.5px;
+}
+.client-summary-box strong {
+  font-size: 16px;
+}
+.client-quick-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.client-quick-bar a {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.client-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.client-history-item {
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.client-history-item:hover {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(255, 255, 255, 0.05);
+}
+.client-history-top,
+.client-history-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.client-history-sub {
+  font-size: 12.5px;
+}
+
+/* Pocket mobile elements hidden on desktop */
+.mobile-menu-btn,
+.mobile-topbar-menu,
+.pocket-filter-chips {
+  display: none;
+}
+
 @media (max-width: 720px) {
-  .header-badges {
+  .header-badges,
+  .desktop-only-btn,
+  #connection-status,
+  #section-home #btn-quick-client,
+  #section-home #btn-quick-orders {
     display: none !important;
   }
+
+  /* 1. Header de 1 sola fila (~52px) */
   .topbar {
     display: flex !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
+    height: auto !important;
+    min-height: 52px !important;
     gap: 8px !important;
-    padding: 8px 12px !important;
+    padding: 6px 10px !important;
   }
   .topbar .mobile-brand {
     order: 1;
-    flex: 0 0 auto;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
     display: flex;
     align-items: center;
   }
   .topbar .mobile-brand .logo {
     height: 30px !important;
-    width: auto !important;
-    max-width: 76px !important;
+    width: 30px !important;
+    max-width: 34px !important;
     object-fit: contain;
-  }
-  .topbar > div:last-child {
-    order: 2;
-    margin-left: auto !important;
-    gap: 5px !important;
-    flex-wrap: nowrap !important;
-  }
-  .topbar #btn-toggle-ui {
-    padding: 5px 9px !important;
-    font-size: 11.5px !important;
-    min-height: 32px !important;
-    white-space: nowrap;
-  }
-  .topbar .secondary.compact {
-    padding: 5px 8px !important;
-    min-height: 32px !important;
-    font-size: 12px !important;
+    border-radius: 8px;
   }
   .topbar .search {
-    order: 3;
-    flex: 1 0 100% !important;
-    width: 100% !important;
+    order: 2;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    width: auto !important;
     min-height: 36px !important;
     padding: 0 10px !important;
   }
   .topbar .search input {
     padding: 6px 0 !important;
+    font-size: 13px !important;
+    min-width: 0 !important;
+  }
+  .topbar .topbar-actions {
+    order: 3;
+    margin-left: 0 !important;
+    flex: 0 0 auto;
+    position: relative;
+  }
+  .mobile-menu-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 16px !important;
+    border-radius: 10px !important;
+  }
+  .mobile-topbar-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 260;
+    min-width: 195px;
+    padding: 8px;
+    border-radius: 12px;
+    background: #131e18;
+    border: 1px solid #2a4033;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .mobile-topbar-menu[hidden] {
+    display: none !important;
+  }
+  .mobile-topbar-menu > * {
+    width: 100%;
+    justify-content: flex-start !important;
+    padding: 9px 10px !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+  }
+
+  /* 2. Bottom nav de 5 pestañas esenciales */
+  .bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+  .bottom-nav [data-section="settings"] {
+    display: none !important;
+  }
+  .bottom-nav .nav-item {
+    font-size: 10.5px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+  }
+
+  /* 3. Inicio Pocket: CTA único + KPIs 2x2 */
+  #section-home .page-heading {
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+  }
+  #section-home .page-heading h1 {
+    font-size: 20px !important;
+  }
+  #section-home .heading-actions {
+    width: 100%;
+  }
+  #section-home #btn-quick-new-order {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    font-size: 14.5px;
+  }
+  #section-home .stats {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+  #section-home .stat {
+    padding: 10px 12px !important;
+    gap: 10px !important;
+  }
+  #section-home .stat-icon {
+    width: 34px !important;
+    height: 34px !important;
+    flex-shrink: 0;
+  }
+  #section-home .stat strong {
+    font-size: 20px !important;
+    line-height: 1.1 !important;
+  }
+  #section-home .stat span {
+    font-size: 11.5px !important;
+  }
+
+  /* 4. Chips de filtro rápido */
+  .pocket-filter-chips {
+    display: flex !important;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 6px;
+    scrollbar-width: none;
+  }
+  .pocket-filter-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .pocket-chip {
+    flex: 0 0 auto;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid #24362c;
+    background: #131e18;
+    color: #9fb5a8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .pocket-chip.active {
+    background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(52, 211, 153, 0.5);
+    color: #34d399;
+  }
+
+  /* 5. Tarjetas de órdenes compactas en 2 líneas (sin desborde) */
+  .order-card-enhanced {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto auto !important;
+    grid-template-rows: auto auto !important;
+    align-items: center !important;
+    gap: 6px 8px !important;
+    padding: 10px 12px !important;
+    overflow: hidden !important;
+  }
+  .order-card-enhanced .brand-icon,
+  .order-card-enhanced .phone-icon,
+  .order-card-enhanced .client-avatar-pro,
+  .order-card-enhanced .client-info-pro span,
+  .order-card-enhanced .order-actions-btns > :not(.btn-wa-action),
+  .order-card-enhanced .btn-wa-action .wa-pro-content span,
+  .order-card-enhanced .order-stepper-wrap > :not(.order-stepper-right) {
+    display: none !important;
+  }
+  .order-card-enhanced .order-stepper-wrap,
+  .order-card-enhanced .order-stepper-right {
+    display: contents !important;
+  }
+  .order-card-enhanced .order-id-pro {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 3px 6px !important;
+    font-size: 11.5px !important;
+  }
+  .order-card-enhanced .order-meta {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0 !important;
+  }
+  .order-card-enhanced .order-meta .device-text {
     font-size: 13.5px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+  .order-card-enhanced .order-meta .fault-text {
+    font-size: 11.5px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+  .order-card-enhanced .badge {
+    grid-column: 3 / 5;
+    grid-row: 1;
+    justify-self: end;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    white-space: nowrap;
+  }
+  .order-card-enhanced .order-client-pro {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .order-card-enhanced .client-info-pro {
+    min-width: 0;
+  }
+  .order-card-enhanced .client-info-pro strong {
+    font-size: 12px !important;
+    color: #9fb5a8 !important;
+    font-weight: 500 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+  .order-card-enhanced .order-finance-badge {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+    font-size: 11px !important;
+    padding: 3px 7px !important;
+    white-space: nowrap;
+  }
+  .order-card-enhanced .order-actions-btns {
+    grid-column: 4;
+    grid-row: 2;
+    justify-self: end;
+    margin: 0 !important;
+  }
+  .order-card-enhanced .btn-wa-action {
+    padding: 0 !important;
+    width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+  }
+
+  /* 6. Lista de compras Pocket ("en proveedor", sin basura) */
+  .purchasing-intro,
+  #purchasing-export,
+  .purchase-row .purchase-check span,
+  .purchase-row .purchase-meta small {
+    display: none !important;
+  }
+  .purchasing-toolbar {
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+  }
+  .purchasing-toolbar #purchasing-search {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+  .purchasing-toolbar #purchasing-resolve-checked {
+    width: 100%;
+    justify-content: center;
+    min-height: 38px;
+  }
+  .purchase-row {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    gap: 6px 10px !important;
+    padding: 10px 12px !important;
+    align-items: start !important;
+  }
+  .purchase-row .purchase-check {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    padding: 6px !important;
+    margin: 0 !important;
+    min-height: 36px;
+    min-width: 36px;
+    justify-content: center;
+  }
+  .purchase-row .purchase-main {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .purchase-row .purchase-main strong {
+    font-size: 14px !important;
+    line-height: 1.25;
+  }
+  .purchase-row .purchase-main p {
+    font-size: 12px !important;
+    margin: 3px 0 0 !important;
+  }
+  .purchase-row .purchase-meta {
+    grid-column: 2;
+    grid-row: 2;
+    align-items: flex-start !important;
+  }
+  .purchase-row .btn-purchase-status {
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+    min-height: 30px !important;
   }
 }
+

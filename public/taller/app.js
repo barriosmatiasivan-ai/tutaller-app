@@ -674,6 +674,12 @@ function setSection(sectionName) {
 
   renderCurrentSection();
 
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  document.querySelector('.main')?.scrollTo?.({ top: 0, behavior: 'auto' });
+  document.querySelector('.content')?.scrollTo?.({ top: 0, behavior: 'auto' });
+
   // Refrescar desde D1 al abrir Reparaciones para mostrar siempre las órdenes guardadas.
   if (sectionName === 'orders' && currentSlug && getWorkshopToken()) {
     api(`/api/workshop/${currentSlug}/data`)
@@ -707,6 +713,8 @@ function renderCurrentSection() {
 }
 
 // 1. Render Dashboard (Inicio)
+let homePocketFilter = 'all';
+
 function renderHome() {
   const orders = workshopData.orders || [];
   const clients = workshopData.clients || [];
@@ -733,10 +741,33 @@ function renderHome() {
   setText('#rev-debt-count', debtCount);
   setText('#rev-debt-text', debtCount > 0 ? `${debtCount} con saldo pendiente` : '✓ Estás al día');
 
+  const chipsEl = document.querySelector('#home-pocket-filters');
+  if (chipsEl) {
+    const chipMap = {
+      all: 'Todas',
+      ready: `Listos (${readyCount})`,
+      active: `En taller (${activeCount})`,
+      debt: `Por cobrar (${debtCount})`
+    };
+    chipsEl.querySelectorAll('[data-home-filter]').forEach(btn => {
+      const f = btn.dataset.homeFilter;
+      if (chipMap[f]) btn.textContent = chipMap[f];
+      btn.classList.toggle('active', f === homePocketFilter);
+    });
+  }
+
   const homeContainer = document.querySelector('#home-orders-container');
   if (!homeContainer) return;
 
   const ongoing = orders.filter(o => !['delivered', 'cancelled'].includes(o.status));
+  let filtered = ongoing;
+  if (homePocketFilter === 'ready') {
+    filtered = ongoing.filter(o => o.status === 'ready');
+  } else if (homePocketFilter === 'active') {
+    filtered = ongoing.filter(o => ['received', 'in_progress'].includes(o.status));
+  } else if (homePocketFilter === 'debt') {
+    filtered = orders.filter(o => Number(o.balance_cents || 0) > 0 && o.status !== 'cancelled');
+  }
 
   if (ongoing.length === 0) {
     homeContainer.innerHTML = `
@@ -755,8 +786,10 @@ function renderHome() {
       </div>
     `;
     document.querySelector('#btn-home-first-order')?.addEventListener('click', openNewOrderModal);
+  } else if (filtered.length === 0) {
+    homeContainer.innerHTML = `<div class="empty" style="padding:22px 12px;text-align:center;"><p class="muted">No hay órdenes en este filtro.</p></div>`;
   } else {
-    homeContainer.innerHTML = ongoing.slice(0, 6).map(orderCardHtml).join('');
+    homeContainer.innerHTML = filtered.slice(0, 6).map(orderCardHtml).join('');
     bindOrderCardClicks(homeContainer);
   }
 }
@@ -1597,10 +1630,16 @@ function renderClients() {
   const container = document.querySelector('#clients-container');
   if (!container) return;
   let list = workshopData.clients || [];
+  const orders = workshopData.orders || [];
 
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
-    list = list.filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.phone && c.phone.includes(q)));
+    list = list.filter(c =>
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.notes && c.notes.toLowerCase().includes(q))
+    );
   }
 
   if (list.length === 0) {
@@ -1617,18 +1656,161 @@ function renderClients() {
     return;
   }
 
-  container.innerHTML = list.map(c => `
-    <div class="client-row">
-      <div class="avatar">${esc(clientInitials(c.name))}</div>
-      <div>
-        <strong>${esc(c.name)}</strong>
-        <p class="muted">${esc(c.phone || 'Sin teléfono')}${c.email ? ` · ${esc(c.email)}` : ''}</p>
+  container.innerHTML = list.map(c => {
+    const clientOrders = orders.filter(o => o.client_id === c.id || (c.phone && o.client_phone === c.phone));
+    const orderCount = Math.max(Number(c.order_count || 0), clientOrders.length);
+    const activeCount = clientOrders.filter(o => !['delivered', 'cancelled'].includes(o.status)).length;
+    const debt = clientOrders
+      .filter(o => o.status !== 'cancelled')
+      .reduce((acc, o) => acc + Math.max(0, Number(o.total_cost || 0) - Number(o.paid_cents || 0) / 100), 0);
+    const waPhone = formatWaMePhone(c.phone);
+
+    return `
+      <div class="client-row client-row-interactive" data-client-id="${c.id}">
+        <div class="avatar">${esc(clientInitials(c.name))}</div>
+        <div class="client-row-info">
+          <div class="client-row-title">
+            <strong>${esc(c.name)}</strong>
+            ${activeCount > 0 ? `<span class="badge repairing" style="font-size:11px;padding:2px 7px;">🔧 ${activeCount} en taller</span>` : ''}
+            ${debt > 0 ? `<span class="order-finance-badge has-debt" style="font-size:11px;padding:2px 7px;">Saldo: ${formatMoney(debt)}</span>` : ''}
+          </div>
+          <p class="muted">${esc(c.phone || 'Sin teléfono')}${c.email ? ` · ${esc(c.email)}` : ''}</p>
+          ${c.notes ? `<small class="muted client-row-note">📝 ${esc(c.notes)}</small>` : ''}
+        </div>
+        <div class="client-row-actions" onclick="event.stopPropagation();">
+          ${waPhone ? `<a class="secondary compact client-wa-btn" href="https://wa.me/${waPhone}" target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp">💬</a>` : ''}
+          <button type="button" class="secondary compact btn-client-new-order" data-client-id="${c.id}" title="Ingresar equipo para este cliente">＋ Orden</button>
+          <button type="button" class="secondary compact btn-client-detail" data-client-id="${c.id}">
+            ${orderCount ? `📋 ${orderCount} ${orderCount === 1 ? 'reparación' : 'reparaciones'}` : '📋 Ficha'}
+          </button>
+        </div>
       </div>
-      <button type="button" class="secondary compact" data-client-phone="${esc(c.phone || '')}">
-        ${c.order_count ? `${c.order_count} reparaciones` : 'Ficha'}
-      </button>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.client-row-interactive').forEach(row => {
+    row.addEventListener('click', () => openClientDetailModal(row.dataset.clientId));
+  });
+  container.querySelectorAll('.btn-client-detail').forEach(btn => {
+    btn.addEventListener('click', () => openClientDetailModal(btn.dataset.clientId));
+  });
+  container.querySelectorAll('.btn-client-new-order').forEach(btn => {
+    btn.addEventListener('click', () => openNewOrderModal(btn.dataset.clientId));
+  });
+}
+
+function openClientDetailModal(clientId) {
+  const client = (workshopData.clients || []).find(c => c.id === clientId);
+  if (!client) return toast('Cliente no encontrado', true);
+
+  const clientOrders = (workshopData.orders || [])
+    .filter(o => o.client_id === client.id || (client.phone && o.client_phone === client.phone))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const totalSpent = clientOrders
+    .filter(o => o.status !== 'cancelled')
+    .reduce((acc, o) => acc + Number(o.total_cost || 0), 0);
+  const totalDebt = clientOrders
+    .filter(o => o.status !== 'cancelled')
+    .reduce((acc, o) => acc + Math.max(0, Number(o.total_cost || 0) - Number(o.paid_cents || 0) / 100), 0);
+
+  const waPhone = formatWaMePhone(client.phone);
+
+  const historyHtml = clientOrders.length
+    ? clientOrders.map(o => {
+        const st = STATUS_CONFIG[o.status] || { label: o.status, class: 'repairing' };
+        const total = Number(o.total_cost || 0);
+        const paid = Number(o.paid_cents || 0) / 100;
+        const saldo = Math.max(0, total - paid);
+        return `
+          <button type="button" class="client-history-item" data-order-id="${o.id}">
+            <div class="client-history-top">
+              <strong>#${o.order_number} · ${esc(o.brand)} ${esc(o.model)}</strong>
+              <span class="badge ${st.class}">${st.label}</span>
+            </div>
+            <div class="client-history-sub">
+              <span class="muted">${esc(o.fault || 'Revisión técnica')} · ${new Date(o.created_at).toLocaleDateString('es-AR')}</span>
+              <span>${saldo > 0 ? `<strong style="color:#fca5a5;">Saldo: ${formatMoney(saldo)}</strong>` : (total > 0 ? formatMoney(total) : 'Sin importe')}</span>
+            </div>
+          </button>
+        `;
+      }).join('')
+    : `<p class="muted" style="margin:8px 0 0;">Este cliente todavía no tiene reparaciones registradas.</p>`;
+
+  const d = modal(`👤 ${esc(client.name)}`, `
+    <div class="client-summary-grid">
+      <div class="client-summary-box">
+        <span class="muted">Reparaciones</span>
+        <strong>${clientOrders.length}</strong>
+      </div>
+      <div class="client-summary-box">
+        <span class="muted">Total facturado</span>
+        <strong>${formatMoney(totalSpent)}</strong>
+      </div>
+      <div class="client-summary-box">
+        <span class="muted">Saldo pendiente</span>
+        <strong style="color:${totalDebt > 0 ? '#fca5a5' : '#34d399'};">${totalDebt > 0 ? formatMoney(totalDebt) : '✓ Al día'}</strong>
+      </div>
     </div>
-  `).join('');
+
+    <div class="client-quick-bar">
+      ${waPhone ? `<a class="secondary compact" href="https://wa.me/${waPhone}" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>` : ''}
+      ${client.phone ? `<a class="secondary compact" href="tel:${esc(client.phone)}">📞 Llamar</a>` : ''}
+      <button type="button" class="primary compact" id="btn-client-modal-new-order">＋ Ingresar equipo</button>
+    </div>
+
+    <form id="edit-client-form" class="form-grid" style="margin-top:14px;">
+      <label>Nombre completo
+        <input name="name" required value="${esc(client.name)}">
+      </label>
+      <label>Teléfono / WhatsApp
+        <input name="phone" required type="tel" value="${esc(client.phone || '')}">
+      </label>
+      <label>Email (opcional)
+        <input name="email" type="email" value="${esc(client.email || '')}" placeholder="cliente@correo.com">
+      </label>
+      <label class="wide">Notas internas
+        <textarea name="notes" rows="2" placeholder="Preferencias, datos de facturación, observaciones...">${esc(client.notes || '')}</textarea>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="primary" id="btn-save-client">Guardar cambios</button>
+      </div>
+    </form>
+
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+      <h3 style="margin:0 0 10px;font-size:15px;">🔧 Historial de reparaciones (${clientOrders.length})</h3>
+      <div class="client-history-list">${historyHtml}</div>
+    </div>
+  `);
+
+  if (!d) return;
+
+  d.querySelector('#btn-client-modal-new-order')?.addEventListener('click', () => {
+    openNewOrderModal(client.id);
+  });
+
+  d.querySelectorAll('.client-history-item').forEach(btn => {
+    btn.addEventListener('click', () => openOrderDetailModal(btn.dataset.orderId));
+  });
+
+  d.querySelector('#edit-client-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = d.querySelector('#btn-save-client');
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+      const payload = Object.fromEntries(new FormData(e.target));
+      await api(`/api/workshop/${currentSlug}/clients/${client.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      toast('✅ Datos del cliente actualizados');
+      await loadWorkshop();
+      openClientDetailModal(client.id);
+    } catch (err) {
+      toast(err.message, true);
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  });
 }
 
 async function promptPurchaseCostAndUpdate(item, nextStatus, onDone) {
@@ -1938,7 +2120,7 @@ function renderSettings() {
 }
 
 // Modal nuevo equipo
-function openNewOrderModal() {
+function openNewOrderModal(preselectedClientId = null) {
   const clients = workshopData.clients || [];
   const clientOptions = clients.map(c => `<option value="${c.id}">${esc(c.name)} (${esc(c.phone || 'S/N')})</option>`).join('');
 
@@ -2002,6 +2184,10 @@ function openNewOrderModal() {
       newClientBlock.style.display = isNew ? 'grid' : 'none';
       newClientBlock.querySelectorAll('input').forEach(inp => inp.required = isNew);
     };
+    if (typeof preselectedClientId === 'string' && preselectedClientId && clientSel.querySelector(`option[value="${CSS.escape(preselectedClientId)}"]`)) {
+      clientSel.value = preselectedClientId;
+      clientSel.onchange();
+    }
   }
 
   const requestId = crypto.randomUUID();
@@ -2870,9 +3056,9 @@ function openNewStockModal(editOrOpts = null) {
 // Modal Lista de compras (solo visualización, gestión de estados y exportación)
 function openPurchasingModal() {
   const d = modal('🛒 Lista de compras', `
-    <p class="muted" style="margin-top:0;">Acá ves los repuestos <strong>Pendientes de compra</strong> y los <strong>Pedidos realizados</strong> por internet. Para agregar nuevos ítems usá el botón <strong>＋ Nuevo producto / repuesto</strong>.</p>
+    <p class="muted purchasing-intro" style="margin-top:0;">Acá ves los repuestos <strong>Pendientes de compra</strong> y los <strong>Pedidos realizados</strong> por internet. Para agregar nuevos ítems usá el botón <strong>＋ Nuevo producto / repuesto</strong>.</p>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+    <div class="purchasing-toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <input type="search" id="purchasing-search" placeholder="Buscar por repuesto, modelo o proveedor..." style="flex:1;min-width:180px;">
       <button type="button" class="primary compact" id="purchasing-resolve-checked" disabled>✓ Marcar ingreso / comprados</button>
       <button type="button" class="secondary compact" id="purchasing-export">⬇ Exportar CSV</button>
@@ -3108,6 +3294,38 @@ function initEvents() {
   document.querySelector('#btn-reload')?.addEventListener('click', () => { toast('Actualizando datos...'); loadWorkshop(); });
   document.querySelector('#btn-settings-header')?.addEventListener('click', () => setSection('settings'));
   document.querySelector('#brand-box')?.addEventListener('click', () => setSection('settings'));
+
+  // Menú Pocket mobile (☰) y filtros rápidos de Inicio
+  const mobileMenuBtn = document.querySelector('#btn-mobile-menu');
+  const mobileMenu = document.querySelector('#mobile-topbar-menu');
+  const closeMobileMenu = () => {
+    if (!mobileMenu || !mobileMenuBtn) return;
+    mobileMenu.hidden = true;
+    mobileMenuBtn.setAttribute('aria-expanded', 'false');
+  };
+  mobileMenuBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nextHidden = !mobileMenu.hidden;
+    mobileMenu.hidden = nextHidden;
+    mobileMenuBtn.setAttribute('aria-expanded', String(!nextHidden));
+  });
+  document.addEventListener('click', (e) => {
+    if (mobileMenu && !mobileMenu.hidden && !mobileMenu.contains(e.target) && e.target !== mobileMenuBtn) {
+      closeMobileMenu();
+    }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMobileMenu(); });
+  document.querySelector('#btn-mobile-reload')?.addEventListener('click', () => { closeMobileMenu(); document.querySelector('#btn-reload')?.click(); });
+  document.querySelector('#btn-mobile-settings')?.addEventListener('click', () => { closeMobileMenu(); setSection('settings'); });
+  document.querySelector('#btn-mobile-logout')?.addEventListener('click', () => { closeMobileMenu(); document.querySelector('#btn-logout-header')?.click(); });
+
+  document.querySelectorAll('#home-pocket-filters [data-home-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      homePocketFilter = btn.dataset.homeFilter || 'all';
+      renderHome();
+    });
+  });
+
   document.querySelector('#btn-report-issue')?.addEventListener('click', openSupportModal);
   document.querySelector('#btn-cash-new')?.addEventListener('click', openNewCashModal);
   document.querySelector('#btn-stock-new')?.addEventListener('click', openNewStockModal);

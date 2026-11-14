@@ -726,7 +726,10 @@ export default {
         const since = new Date(Date.now() - 15 * 60000).toISOString();
         const recent = await db.prepare('SELECT COUNT(*) AS n FROM workshop_login_codes WHERE workshop_id=? AND email=? AND created_at>?').bind(workshop.id, email, since).first();
         if (recent.n >= 3) return json({ error: 'Esperá antes de pedir otro código.' }, 429);
-        const pinCode = String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);
+        const isStagingNoEmail = env.ENVIRONMENT === 'staging' && !env.RESEND_API_KEY;
+        const pinCode = isStagingNoEmail
+          ? '123456'
+          : String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);
         const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
         const codeId = crypto.randomUUID();
         const nowIso = new Date().toISOString();
@@ -735,6 +738,10 @@ export default {
           INSERT INTO workshop_login_codes (id, workshop_id, email, code, expires_at, used, created_at)
           VALUES (?, ?, ?, ?, ?, 0, ?)
         `).bind(codeId, workshop.id, email, pinCode, expiresAt, nowIso).run();
+
+        if (isStagingNoEmail) {
+          return json({ success: true, message: 'Modo Staging: ingresá el código 123456.' });
+        }
 
         const sent = await sendResendPinEmail(email, pinCode, workshop.name, env);
         if (!sent.success) {

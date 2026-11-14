@@ -1351,6 +1351,111 @@ body.is-login #workshop-login-view {
   }
 }
 
+/* Agenda de clientes interactiva y ficha de cliente */
+.client-row-interactive {
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.client-row-interactive:hover {
+  border-color: rgba(52, 211, 153, 0.35) !important;
+}
+.client-row-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.client-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.client-row-note {
+  display: block;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.client-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.client-wa-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.client-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.client-summary-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.client-summary-box span {
+  font-size: 11.5px;
+}
+.client-summary-box strong {
+  font-size: 16px;
+}
+.client-quick-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.client-quick-bar a {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.client-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.client-history-item {
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.client-history-item:hover {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(255, 255, 255, 0.05);
+}
+.client-history-top,
+.client-history-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.client-history-sub {
+  font-size: 12.5px;
+}
+
 /* Pocket mobile elements hidden on desktop */
 .mobile-menu-btn,
 .mobile-topbar-menu,

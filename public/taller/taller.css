@@ -1350,3 +1350,9 @@ body.is-login #workshop-login-view {
     min-width: 0;
   }
 }
+
+@media (max-width: 720px) {
+  .header-badges {
+    display: none !important;
+  }
+}

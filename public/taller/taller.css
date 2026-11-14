@@ -1351,13 +1351,26 @@ body.is-login #workshop-login-view {
   }
 }
 
+/* Pocket mobile elements hidden on desktop */
+.mobile-menu-btn,
+.mobile-topbar-menu,
+.pocket-filter-chips {
+  display: none;
+}
+
 @media (max-width: 720px) {
-  .header-badges {
+  .header-badges,
+  .desktop-only-btn,
+  #connection-status,
+  #section-home #btn-quick-client,
+  #section-home #btn-quick-orders {
     display: none !important;
   }
+
+  /* 1. Header de 1 sola fila (~52px) */
   .topbar {
     display: flex !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
     gap: 8px !important;
     padding: 8px 12px !important;
@@ -1370,36 +1383,227 @@ body.is-login #workshop-login-view {
   }
   .topbar .mobile-brand .logo {
     height: 30px !important;
-    width: auto !important;
-    max-width: 76px !important;
+    width: 30px !important;
+    max-width: 34px !important;
     object-fit: contain;
-  }
-  .topbar > div:last-child {
-    order: 2;
-    margin-left: auto !important;
-    gap: 5px !important;
-    flex-wrap: nowrap !important;
-  }
-  .topbar #btn-toggle-ui {
-    padding: 5px 9px !important;
-    font-size: 11.5px !important;
-    min-height: 32px !important;
-    white-space: nowrap;
-  }
-  .topbar .secondary.compact {
-    padding: 5px 8px !important;
-    min-height: 32px !important;
-    font-size: 12px !important;
+    border-radius: 8px;
   }
   .topbar .search {
-    order: 3;
-    flex: 1 0 100% !important;
-    width: 100% !important;
+    order: 2;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    width: auto !important;
     min-height: 36px !important;
     padding: 0 10px !important;
   }
   .topbar .search input {
     padding: 6px 0 !important;
+    font-size: 13px !important;
+    min-width: 0 !important;
+  }
+  .topbar .topbar-actions {
+    order: 3;
+    margin-left: 0 !important;
+    flex: 0 0 auto;
+    position: relative;
+  }
+  .mobile-menu-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 16px !important;
+    border-radius: 10px !important;
+  }
+  .mobile-topbar-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 260;
+    min-width: 195px;
+    padding: 8px;
+    border-radius: 12px;
+    background: #131e18;
+    border: 1px solid #2a4033;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .mobile-topbar-menu[hidden] {
+    display: none !important;
+  }
+  .mobile-topbar-menu > * {
+    width: 100%;
+    justify-content: flex-start !important;
+    padding: 9px 10px !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+  }
+
+  /* 2. Bottom nav de 5 pestañas esenciales */
+  .bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+  .bottom-nav [data-section="settings"] {
+    display: none !important;
+  }
+  .bottom-nav .nav-item {
+    font-size: 10.5px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+  }
+
+  /* 3. Inicio Pocket: CTA único + KPIs 2x2 */
+  #section-home .page-heading {
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+  }
+  #section-home .page-heading h1 {
+    font-size: 20px !important;
+  }
+  #section-home .heading-actions {
+    width: 100%;
+  }
+  #section-home #btn-quick-new-order {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    font-size: 14.5px;
+  }
+  #section-home .stats {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+  #section-home .stat {
+    padding: 10px 12px !important;
+    gap: 10px !important;
+  }
+  #section-home .stat-icon {
+    width: 34px !important;
+    height: 34px !important;
+    flex-shrink: 0;
+  }
+  #section-home .stat strong {
+    font-size: 20px !important;
+    line-height: 1.1 !important;
+  }
+  #section-home .stat span {
+    font-size: 11.5px !important;
+  }
+
+  /* 4. Chips de filtro rápido */
+  .pocket-filter-chips {
+    display: flex !important;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 6px;
+    scrollbar-width: none;
+  }
+  .pocket-filter-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .pocket-chip {
+    flex: 0 0 auto;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid #24362c;
+    background: #131e18;
+    color: #9fb5a8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .pocket-chip.active {
+    background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(52, 211, 153, 0.5);
+    color: #34d399;
+  }
+
+  /* 5. Tarjetas de órdenes compactas en 2 líneas */
+  .order-card-enhanced {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto !important;
+    align-items: center !important;
+    gap: 4px 8px !important;
+    padding: 11px 12px !important;
+  }
+  .order-card-enhanced .brand-icon,
+  .order-card-enhanced .phone-icon,
+  .order-card-enhanced .client-avatar-pro,
+  .order-card-enhanced .client-info-pro span,
+  .order-card-enhanced .order-actions-btns > :not(.btn-wa-action) {
+    display: none !important;
+  }
+  .order-card-enhanced .order-id-pro {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 3px 6px !important;
+    font-size: 11.5px !important;
+  }
+  .order-card-enhanced .order-meta {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0 !important;
+  }
+  .order-card-enhanced .order-meta .device-text {
     font-size: 13.5px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+  .order-card-enhanced .order-meta .fault-text {
+    font-size: 11.5px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+  .order-card-enhanced .badge {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+  }
+  .order-card-enhanced .order-client-pro {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    min-width: 0;
+  }
+  .order-card-enhanced .client-info-pro strong {
+    font-size: 12px !important;
+    color: #9fb5a8 !important;
+    font-weight: 500 !important;
+  }
+  .order-card-enhanced .order-finance-badge {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    font-size: 11px !important;
+    padding: 2px 7px !important;
+  }
+  .order-card-enhanced .order-actions-btns {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+  }
+  .order-card-enhanced .btn-wa-action {
+    padding: 4px 8px !important;
+    font-size: 11.5px !important;
+    min-height: 28px !important;
   }
 }
+

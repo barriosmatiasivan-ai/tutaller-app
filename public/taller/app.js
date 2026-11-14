@@ -707,6 +707,8 @@ function renderCurrentSection() {
 }
 
 // 1. Render Dashboard (Inicio)
+let homePocketFilter = 'all';
+
 function renderHome() {
   const orders = workshopData.orders || [];
   const clients = workshopData.clients || [];
@@ -733,10 +735,33 @@ function renderHome() {
   setText('#rev-debt-count', debtCount);
   setText('#rev-debt-text', debtCount > 0 ? `${debtCount} con saldo pendiente` : '✓ Estás al día');
 
+  const chipsEl = document.querySelector('#home-pocket-filters');
+  if (chipsEl) {
+    const chipMap = {
+      all: 'Todas',
+      ready: `Listos (${readyCount})`,
+      active: `En taller (${activeCount})`,
+      debt: `Por cobrar (${debtCount})`
+    };
+    chipsEl.querySelectorAll('[data-home-filter]').forEach(btn => {
+      const f = btn.dataset.homeFilter;
+      if (chipMap[f]) btn.textContent = chipMap[f];
+      btn.classList.toggle('active', f === homePocketFilter);
+    });
+  }
+
   const homeContainer = document.querySelector('#home-orders-container');
   if (!homeContainer) return;
 
   const ongoing = orders.filter(o => !['delivered', 'cancelled'].includes(o.status));
+  let filtered = ongoing;
+  if (homePocketFilter === 'ready') {
+    filtered = ongoing.filter(o => o.status === 'ready');
+  } else if (homePocketFilter === 'active') {
+    filtered = ongoing.filter(o => ['received', 'in_progress'].includes(o.status));
+  } else if (homePocketFilter === 'debt') {
+    filtered = orders.filter(o => Number(o.balance_cents || 0) > 0 && o.status !== 'cancelled');
+  }
 
   if (ongoing.length === 0) {
     homeContainer.innerHTML = `
@@ -755,8 +780,10 @@ function renderHome() {
       </div>
     `;
     document.querySelector('#btn-home-first-order')?.addEventListener('click', openNewOrderModal);
+  } else if (filtered.length === 0) {
+    homeContainer.innerHTML = `<div class="empty" style="padding:22px 12px;text-align:center;"><p class="muted">No hay órdenes en este filtro.</p></div>`;
   } else {
-    homeContainer.innerHTML = ongoing.slice(0, 6).map(orderCardHtml).join('');
+    homeContainer.innerHTML = filtered.slice(0, 6).map(orderCardHtml).join('');
     bindOrderCardClicks(homeContainer);
   }
 }
@@ -3108,6 +3135,38 @@ function initEvents() {
   document.querySelector('#btn-reload')?.addEventListener('click', () => { toast('Actualizando datos...'); loadWorkshop(); });
   document.querySelector('#btn-settings-header')?.addEventListener('click', () => setSection('settings'));
   document.querySelector('#brand-box')?.addEventListener('click', () => setSection('settings'));
+
+  // Menú Pocket mobile (☰) y filtros rápidos de Inicio
+  const mobileMenuBtn = document.querySelector('#btn-mobile-menu');
+  const mobileMenu = document.querySelector('#mobile-topbar-menu');
+  const closeMobileMenu = () => {
+    if (!mobileMenu || !mobileMenuBtn) return;
+    mobileMenu.hidden = true;
+    mobileMenuBtn.setAttribute('aria-expanded', 'false');
+  };
+  mobileMenuBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nextHidden = !mobileMenu.hidden;
+    mobileMenu.hidden = nextHidden;
+    mobileMenuBtn.setAttribute('aria-expanded', String(!nextHidden));
+  });
+  document.addEventListener('click', (e) => {
+    if (mobileMenu && !mobileMenu.hidden && !mobileMenu.contains(e.target) && e.target !== mobileMenuBtn) {
+      closeMobileMenu();
+    }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMobileMenu(); });
+  document.querySelector('#btn-mobile-reload')?.addEventListener('click', () => { closeMobileMenu(); document.querySelector('#btn-reload')?.click(); });
+  document.querySelector('#btn-mobile-settings')?.addEventListener('click', () => { closeMobileMenu(); setSection('settings'); });
+  document.querySelector('#btn-mobile-logout')?.addEventListener('click', () => { closeMobileMenu(); document.querySelector('#btn-logout-header')?.click(); });
+
+  document.querySelectorAll('#home-pocket-filters [data-home-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      homePocketFilter = btn.dataset.homeFilter || 'all';
+      renderHome();
+    });
+  });
+
   document.querySelector('#btn-report-issue')?.addEventListener('click', openSupportModal);
   document.querySelector('#btn-cash-new')?.addEventListener('click', openNewCashModal);
   document.querySelector('#btn-stock-new')?.addEventListener('click', openNewStockModal);

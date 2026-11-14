@@ -153,10 +153,16 @@
         </div>
 
         <!-- Botones de cabecera -->
-        <div style="display:inline-flex;gap:8px;align-items:center;margin-left:auto;">
-          <button class="secondary compact" id="btn-reload" title="Actualizar datos">↻</button>
-          <button class="secondary compact" id="btn-settings-header" title="Configuración">⚙</button>
-          <button type="button" class="secondary compact" id="btn-logout-header" title="Cerrar sesión del taller" style="color:#ef4444;font-size:12px;">🚪 Salir</button>
+        <div class="topbar-actions" style="display:inline-flex;gap:8px;align-items:center;margin-left:auto;position:relative;">
+          <button class="secondary compact desktop-only-btn" id="btn-reload" title="Actualizar datos">↻</button>
+          <button class="secondary compact desktop-only-btn" id="btn-settings-header" title="Configuración">⚙</button>
+          <button type="button" class="secondary compact desktop-only-btn" id="btn-logout-header" title="Cerrar sesión del taller" style="color:#ef4444;font-size:12px;">🚪 Salir</button>
+          <button type="button" class="secondary compact mobile-menu-btn" id="btn-mobile-menu" aria-label="Menú" aria-expanded="false" aria-haspopup="true">☰</button>
+          <div class="mobile-topbar-menu" id="mobile-topbar-menu" hidden>
+            <button type="button" class="secondary compact" id="btn-mobile-reload">↻ Actualizar datos</button>
+            <button type="button" class="secondary compact" id="btn-mobile-settings">⚙ Configuración</button>
+            <button type="button" class="secondary compact" id="btn-mobile-logout" style="color:#ef4444;">🚪 Cerrar sesión</button>
+          </div>
         </div>
       </header>
 
@@ -220,6 +226,12 @@
               <div class="panel-heading">
                 <h2>Reparaciones en curso</h2>
                 <button type="button" class="text-button" id="link-goto-orders">Ver todas →</button>
+              </div>
+              <div class="pocket-filter-chips" id="home-pocket-filters" aria-label="Filtros rápidos">
+                <button type="button" class="pocket-chip active" data-home-filter="all">Todas</button>
+                <button type="button" class="pocket-chip" data-home-filter="ready">Listos</button>
+                <button type="button" class="pocket-chip" data-home-filter="active">En taller</button>
+                <button type="button" class="pocket-chip" data-home-filter="debt">Por cobrar</button>
               </div>
               <div id="home-orders-container">
                 <!-- Se llena con las tarjetas de orden o con el cartel de bienvenida -->

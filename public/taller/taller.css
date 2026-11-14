@@ -1355,4 +1355,51 @@ body.is-login #workshop-login-view {
   .header-badges {
     display: none !important;
   }
+  .topbar {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 12px !important;
+  }
+  .topbar .mobile-brand {
+    order: 1;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+  }
+  .topbar .mobile-brand .logo {
+    height: 30px !important;
+    width: auto !important;
+    max-width: 76px !important;
+    object-fit: contain;
+  }
+  .topbar > div:last-child {
+    order: 2;
+    margin-left: auto !important;
+    gap: 5px !important;
+    flex-wrap: nowrap !important;
+  }
+  .topbar #btn-toggle-ui {
+    padding: 5px 9px !important;
+    font-size: 11.5px !important;
+    min-height: 32px !important;
+    white-space: nowrap;
+  }
+  .topbar .secondary.compact {
+    padding: 5px 8px !important;
+    min-height: 32px !important;
+    font-size: 12px !important;
+  }
+  .topbar .search {
+    order: 3;
+    flex: 1 0 100% !important;
+    width: 100% !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+  }
+  .topbar .search input {
+    padding: 6px 0 !important;
+    font-size: 13.5px !important;
+  }
 }

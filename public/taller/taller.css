@@ -1313,3 +1313,38 @@ body.is-login #workshop-login-view {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Barra horizontal compacta para filtros de Caja */
+.cash-filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+.cash-filter-bar input[type="search"] {
+  width: auto;
+  flex: 1 1 200px;
+  max-width: 280px;
+}
+.cash-filter-bar select,
+.cash-filter-bar input[type="date"] {
+  width: auto;
+  flex: 0 0 auto;
+}
+@media (max-width: 720px) {
+  .cash-filter-bar {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .cash-filter-bar input[type="search"] {
+    max-width: none;
+    flex: 1 1 100%;
+  }
+  .cash-filter-bar select,
+  .cash-filter-bar input[type="date"] {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+}

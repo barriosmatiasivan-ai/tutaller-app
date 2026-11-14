@@ -674,6 +674,12 @@ function setSection(sectionName) {
 
   renderCurrentSection();
 
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  document.querySelector('.main')?.scrollTo?.({ top: 0, behavior: 'auto' });
+  document.querySelector('.content')?.scrollTo?.({ top: 0, behavior: 'auto' });
+
   // Refrescar desde D1 al abrir Reparaciones para mostrar siempre las órdenes guardadas.
   if (sectionName === 'orders' && currentSlug && getWorkshopToken()) {
     api(`/api/workshop/${currentSlug}/data`)

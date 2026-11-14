@@ -1379,7 +1379,8 @@ body.is-login #workshop-login-view {
   }
   .topbar .mobile-brand {
     order: 1;
-    flex: 0 0 auto;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
     display: flex;
     align-items: center;
   }

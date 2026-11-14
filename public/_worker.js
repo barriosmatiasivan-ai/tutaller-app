@@ -1089,6 +1089,18 @@ export default {
         return json({id}, 201);
       }
 
+      if (subRoute.startsWith('clients/') && request.method === 'PUT') {
+        const clientId = subRoute.split('/')[1];
+        const body = await request.json();
+        if (!body.name?.trim() || !body.phone?.trim()) return json({error:'Completá nombre y teléfono.'}, 400);
+        const existing = await db.prepare('SELECT id FROM clients WHERE id=? AND workshop_id=?').bind(clientId, workshop.id).first();
+        if (!existing) return json({error:'Cliente no encontrado.'}, 404);
+        const now = new Date().toISOString();
+        await db.prepare('UPDATE clients SET name=?, phone=?, email=?, notes=?, updated_at=? WHERE id=? AND workshop_id=?')
+          .bind(body.name.trim(), body.phone.trim(), body.email || '', body.notes || '', now, clientId, workshop.id).run();
+        return json({success:true});
+      }
+
       if (subRoute === 'brand' && request.method === 'PUT') {
         const {name, phone, address='', logo_url=''} = await request.json();
         const validLogo = !logo_url || /^https:\/\//i.test(logo_url) || logo_url.startsWith('/api/workshop/');
